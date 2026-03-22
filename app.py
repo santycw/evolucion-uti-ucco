@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 
 # Configuración de estética y página
 st.set_page_config(page_title="Evolución UTI/UCCO", page_icon="🏥", layout="wide")
@@ -11,31 +12,80 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión con Diagnóstico y ECG Estándar (AHA/ACC/HRS)")
+st.caption("Versión Definitiva: Módulos Inteligentes + ARM Completo + ECG AHA")
 
 # --- DATOS GENERALES (SIDEBAR) ---
 with st.sidebar:
     st.header("📌 Datos de Base")
     dias_int = st.text_input("Días Internación")
     dias_arm = st.text_input("Días ARM")
-    sofa = st.text_input("SOFA")
-    apache = st.text_input("APACHE II")
     st.divider()
-    st.warning("⚠️ Los datos se borran al cerrar o refrescar la pestaña.")
+    st.info("💡 Escribe palabras como 'Sepsis', 'IAM', o 'Pancreatitis' en el diagnóstico para activar los scores de gravedad automáticos.")
+
+# --- INICIALIZACIÓN DE VARIABLES CONDICIONALES ---
+sofa = apache = ""
+killip = grace = timi = ""
+bisap = ranson = balthazar = ""
+
+# --- SECCIÓN DIAGNÓSTICO E INTELIGENCIA SEMÁNTICA ---
+st.subheader("📋 Diagnóstico Principal")
+diagnostico = st.text_area("Diagnósticos de Ingreso / Actuales:", "1. \n2. ")
+
+# Normalización del texto para el análisis
+diag_norm = diagnostico.lower()
+diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
+diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
+diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
+diag_norm = re.sub(r'[óöôò]', 'o', diag_norm)
+diag_norm = re.sub(r'[úüûù]', 'u', diag_norm)
+
+# Diccionarios de palabras clave
+kw_cardio = ["scasest", "iam", "iamcest", "infarto", "angina", "angor", "coronario", "isquemia"]
+kw_sepsis = ["sepsis", "septic", "infeccion", "neumonia", "itu", "meningitis", "peritonitis", "bacteriemia", "shock"]
+kw_pancreatitis = ["pancreatitis"]
+
+is_cardio = any(kw in diag_norm for kw in kw_cardio)
+is_sepsis = any(kw in diag_norm for kw in kw_sepsis)
+is_pancreatitis = any(kw in diag_norm for kw in kw_pancreatitis)
+
+# --- RENDERIZADO DE MÓDULOS DINÁMICOS (SCORES) ---
+if is_cardio or is_sepsis or is_pancreatitis:
+    st.markdown("### ⚙️ Scores de Gravedad Activados")
+
+if is_cardio:
+    with st.expander("🫀 Estadificación Coronaria (SCASEST / IAM)", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        killip = c1.selectbox("Killip y Kimball", ["", "I (Sin IC)", "II (Estertores/R3)", "III (EAP)", "IV (Shock Cardiogénico)"])
+        grace = c2.text_input("Score GRACE")
+        timi = c3.text_input("Score TIMI (0-7)")
+
+if is_sepsis:
+    with st.expander("🦠 Scores de Sepsis", expanded=True):
+        s1, s2 = st.columns(2)
+        sofa = s1.text_input("SOFA Score")
+        apache = s2.text_input("APACHE II")
+
+if is_pancreatitis:
+    with st.expander("⚕️ Estadificación Pancreática", expanded=True):
+        p1, p2, p3 = st.columns(3)
+        bisap = p1.text_input("BISAP (0-5)")
+        ranson = p2.text_input("Criterios de Ranson")
+        balthazar = p3.selectbox("Balthazar (TC)", ["", "A (Normal)", "B (Agrandamiento)", "C (Inflamación)", "D (1 Colección)", "E (≥2 Colecciones / Gas)"])
+
+st.divider()
 
 # --- CUERPO PRINCIPAL ---
 tab_clinca, tab_lab, tab_planes = st.tabs(["🩺 Examen Físico / Clínica", "🧪 Laboratorio y EAB", "📋 FAST HUG y Plan Final"])
 
 with tab_clinca:
-    # --- DIAGNÓSTICO (NUEVO) ---
-    st.subheader("📋 Diagnóstico")
-    diagnostico = st.text_area("Diagnóstico(s) de Ingreso / Actuales:", "1. \n2. ")
-    
-    st.divider()
-
-    # --- SUBJETIVO ---
     st.subheader("(S) Subjetivo")
     subj = st.text_area("Novedades y Subjetivo:", "Paciente estable, sin cambios agudos.")
+
+    # INFUSIONES Y DROGAS (Devueltas a la Pestaña Principal)
+    st.subheader("💊 Infusiones y Drogas")
+    i1, i2 = st.columns(2)
+    sedo = i1.text_area("Sedoanalgesia", "Fentanilo: \nPropofol: \nMidazolam: \nBloq NM:")
+    vaso = i2.text_area("Vasoactivos", "Noradrenalina: \nVasopresina: \nDobutamina: \nAdrenalina:")
 
     st.subheader("💉 Dispositivos e Invasiones")
     d1, d2, d3, d4 = st.columns(4)
@@ -62,10 +112,9 @@ with tab_clinca:
     fc = h2.text_input("FC (lpm)")
     fr = h3.text_input("FR (rpm)")
     sat = h4.text_input("SatO2 (%)")
-    temp = h5.text_input("Temp (°C)")
+    temp = h5.text_input("Temp Actual (°C)")
 
-    # Apartado específico de ECG (Basado en recomendaciones 2007-2009)
-    st.info("📊 Interpretación del Electrocardiograma (ECG)")
+    st.info("📊 Electrocardiograma (AHA/ACC/HRS)")
     e_col1, e_col2, e_col3, e_col4 = st.columns(4)
     ecg_ritmo = e_col1.text_input("Ritmo", "Sinusal")
     ecg_eje = e_col2.text_input("Eje QRS (°)", "Normoeje")
@@ -78,22 +127,43 @@ with tab_clinca:
     ecg_onda_t = e_col7.text_input("Onda T", "Normal/Asimétrica")
 
     ecg_otros = st.text_input("Otros (HVI/HVD, Bloqueos, Ondas Q)", "Sin bloqueos ni ondas Q patológicas.")
-    ex_cv = st.text_area("Examen Cardiovascular (Auscultación/Edemas)", "R1 y R2 normofonéticos, silencios libres, sin edemas.")
+    ex_cv = st.text_area("Auscultación / Perfusión", "R1 y R2 normofonéticos. Relleno capilar < 2seg. Sin edemas.")
 
-    # 3. RESPIRATORIO
-    st.subheader("3. Respiratorio (ARM)")
-    r1, r2, r3, r4, r5 = st.columns(5)
+    # 3. RESPIRATORIO (COMPLIANCE, DP Y PAFI RESTAURADOS)
+    st.subheader("3. Respiratorio (ARM) y Mecánica")
+    r1, r2, r3, r4 = st.columns(4)
     via_aerea = r1.text_input("Vía Aérea", "TOT")
     modo = r2.text_input("Modo", "VCV")
     fio2 = r3.number_input("FiO2 (%)", 21, 100, 21)
     peep = r4.number_input("PEEP", 0, 30, 5)
-    pplat = r5.text_input("P. Plateau")
+    
+    r5, r6, r7, r8 = st.columns(4)
+    ppico = r5.text_input("P. Pico (cmH2O)")
+    pplat = r6.text_input("P. Plateau (cmH2O)")
+    comp = r7.text_input("Compliance (ml/cmH2O)")
+    vt = r8.text_input("Volumen Tidal (Vt)")
+
+    st.caption("Índices Respiratorios (Se calculan al generar, o puedes escribirlos a mano):")
+    r9, r10 = st.columns(2)
+    dp_manual = r9.text_input("Driving Pressure (DP)")
+    pafi_manual = r10.text_input("PaFiO2")
+
     ex_resp = st.text_area("Examen Respiratorio", "Buena entrada de aire bilateral, sin ruidos agregados.")
 
-    st.subheader("4. Otros Sistemas")
+    # 4. OTROS SISTEMAS
+    st.subheader("4. Digestivo y Renal")
     o1, o2 = st.columns(2)
     ex_abd = o1.text_area("Abdominal", "Blando, depresible, indoloro.")
     ex_renal = o2.text_area("Renal/Balance", "Diuresis conservada.")
+
+    # 5. INFECTOLOGÍA (Siempre visible)
+    st.subheader("5. Infectología")
+    inf1, inf2, inf3, inf4 = st.columns(4)
+    tmax = inf1.text_input("T. Max 24h")
+    pct = inf2.text_input("PCT")
+    atb1 = inf3.text_input("ATB 1 (Día)")
+    atb2 = inf4.text_input("ATB 2 (Día)")
+    cultivos = st.text_area("Cultivos en curso", "Negativos a la fecha.")
 
 with tab_lab:
     st.subheader("Estado Ácido Base y Laboratorio")
@@ -128,7 +198,16 @@ with tab_planes:
 
 # --- GENERACIÓN DE TEXTO ---
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
-    # Cálculo TAM aproximado
+    # Ensamblaje de Módulos Dinámicos
+    txt_modulos = ""
+    if is_cardio and (killip or grace or timi):
+        txt_modulos += f"\n[+] ESTADIFICACIÓN CARDIOVASCULAR:\n    Killip: {killip} | GRACE: {grace} | TIMI: {timi}\n"
+    if is_sepsis and (sofa or apache):
+        txt_modulos += f"\n[+] SCORES DE SEPSIS:\n    SOFA: {sofa} | APACHE II: {apache}\n"
+    if is_pancreatitis and (bisap or ranson or balthazar):
+        txt_modulos += f"\n[+] ESTADIFICACIÓN PANCREÁTICA:\n    BISAP: {bisap} | Ranson: {ranson} | Balthazar: {balthazar}\n"
+
+    # Cálculo TAM Automático
     tam_txt = ""
     if "/" in ta:
         try:
@@ -136,31 +215,45 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
             tam_txt = f"(TAM {round((s+2*d)/3)})"
         except: pass
 
-    # Cálculo PAFI
-    pafi_txt = ""
-    if po2 and fio2:
-        try: pafi_txt = f"| PAFI: {int(float(po2)/(fio2/100))}"
+    # Cálculo Driving Pressure (Híbrido: toma manual si existe, sino calcula)
+    dp_final = dp_manual
+    if not dp_final and pplat and peep:
+        try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
+        except: pass
+
+    # Cálculo PAFI (Híbrido)
+    pafi_final = pafi_manual
+    if not pafi_final and po2 and fio2:
+        try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
         except: pass
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
-Días Int: {dias_int} | Días ARM: {dias_arm} | SOFA: {sofa}
+Días Int: {dias_int} | Días ARM: {dias_arm}
 
 DIAGNÓSTICO:
 {diagnostico}
-
+{txt_modulos}
 (S) SUBJETIVO: {subj}
 
 (O) OBJETIVO:
+
+>> INFUSIONES Y DROGAS:
+Sedoanalgesia: {sedo.replace(chr(10), ' | ')}
+Vasoactivos: {vaso.replace(chr(10), ' | ')}
+
 >> INVASIONES: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
-- NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}. {ex_neuro}
+- NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}. {ex_neuro}
 - HEMO: TA {ta} {tam_txt}, FC {fc} lpm, FR {fr} rpm, Sat {sat}%, Temp {temp}°C. 
-- ECG (AHA/ACC/HRS): Ritmo {ecg_ritmo}, Eje {ecg_eje}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms. ST: {ecg_st}, Onda T: {ecg_onda_t}. {ecg_otros}
-- CV: {ex_cv}
-- RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep}, PPlat {pplat} {pafi_txt}. {ex_resp}
+- ECG: Ritmo {ecg_ritmo}, Eje {ecg_eje}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms. ST: {ecg_st}, Onda T: {ecg_onda_t}. {ecg_otros}
+- CV (Perfusión): {ex_cv}
+- RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep}, PPlat {pplat}, Vt {vt}.
+  Mecánica: P.Pico {ppico} | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}. 
+  Examen: {ex_resp}
 - ABD: {ex_abd}
 - RENAL: {ex_renal}
+- INFECTO: Tmax {tmax}°C | PCT {pct} | ATB: {atb1} / {atb2} | Cultivos: {cultivos.replace(chr(10), ' ')}
 
 >> LABORATORIO / EAB:
 pH {ph} | pCO2 {pco2} | pO2 {po2} | HCO3 {hco3} | Lac {lac}
