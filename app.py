@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Laboratorio Avanzado + Scores de Guías Internacionales")
+st.caption("Motor MBE: Infusiones Avanzadas y Limpieza Automática")
 
 # --- DATOS GENERALES ---
 with st.sidebar:
@@ -175,9 +175,14 @@ with tab_clinca:
     subj = st.text_area("Novedades y Subjetivo:", "Paciente estable, sin cambios agudos.")
 
     st.subheader("💊 Infusiones y Drogas")
+    st.caption("Escribe la dosis sólo en las drogas que use. Las que dejes vacías (ej: 'Propofol: ') se borrarán solas en el texto final.")
     i1, i2 = st.columns(2)
-    sedo = i1.text_area("Sedoanalgesia", "Fentanilo: \nPropofol: \nMidazolam:")
-    vaso = i2.text_area("Vasoactivos", "Noradrenalina: \nVasopresina: \nDobutamina:")
+    
+    sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: \nBloq. NM (Atracurio/Rocuronio): "
+    sedo = i1.text_area("Sedoanalgesia (PADIS)", sedo_def, height=220)
+    
+    vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLevosimendan: \nDopamina: \nNTG/NTP: \nLabetalol/Esmolol: "
+    vaso = i2.text_area("Vasoactivos/Inotrópicos (AHA/SSC)", vaso_def, height=220)
 
     st.subheader("💉 Dispositivos")
     d1, d2, d3, d4 = st.columns(4)
@@ -265,6 +270,15 @@ with tab_planes:
     analisis, plan = st.text_area("Análisis"), st.text_area("Plan 24hs")
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
+    
+    # 🌟 RUTINA DE AUTO-LIMPIEZA PARA DROGAS 🌟
+    # Filtra y se queda SOLO con las líneas que tienen texto escrito después de los dos puntos ":"
+    sedo_clean = " | ".join([line.strip() for line in sedo.split('\n') if line.strip() and not line.strip().endswith(':')])
+    if not sedo_clean: sedo_clean = "Sin infusiones."
+    
+    vaso_clean = " | ".join([line.strip() for line in vaso.split('\n') if line.strip() and not line.strip().endswith(':')])
+    if not vaso_clean: vaso_clean = "Sin infusiones."
+
     txt_modulos = ""
     if is_isquemia and any([killip, grace, timi]): txt_modulos += f"\n[+] IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
     if is_ic and any([nyha, stevenson, aha_ic]): txt_modulos += f"\n[+] IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
@@ -296,8 +310,8 @@ DIAGNÓSTICO:{txt_modulos}
 
 (O) OBJETIVO:
 >> INFUSIONES Y DROGAS:
-Sedoanalgesia: {sedo.replace(chr(10), ' | ')}
-Vasoactivos: {vaso.replace(chr(10), ' | ')}
+Sedoanalgesia: {sedo_clean}
+Vasoactivos: {vaso_clean}
 
 >> INVASIONES: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
