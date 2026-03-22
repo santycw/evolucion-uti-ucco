@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión con Interpretación ECG Estándar (AHA/ACC/HRS)")
+st.caption("Versión con Diagnóstico y ECG Estándar (AHA/ACC/HRS)")
 
 # --- DATOS GENERALES (SIDEBAR) ---
 with st.sidebar:
@@ -27,6 +27,13 @@ with st.sidebar:
 tab_clinca, tab_lab, tab_planes = st.tabs(["🩺 Examen Físico / Clínica", "🧪 Laboratorio y EAB", "📋 FAST HUG y Plan Final"])
 
 with tab_clinca:
+    # --- DIAGNÓSTICO (NUEVO) ---
+    st.subheader("📋 Diagnóstico")
+    diagnostico = st.text_area("Diagnóstico(s) de Ingreso / Actuales:", "1. \n2. ")
+    
+    st.divider()
+
+    # --- SUBJETIVO ---
     st.subheader("(S) Subjetivo")
     subj = st.text_area("Novedades y Subjetivo:", "Paciente estable, sin cambios agudos.")
 
@@ -137,6 +144,9 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Int: {dias_int} | Días ARM: {dias_arm} | SOFA: {sofa}
+
+DIAGNÓSTICO:
+{diagnostico}
 
 (S) SUBJETIVO: {subj}
 
