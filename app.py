@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Infusiones Avanzadas y Limpieza Automática")
+st.caption("Motor MBE: Hemodinamia Avanzada, Cultivos Estructurados y Auto-Limpieza")
 
 # --- DATOS GENERALES ---
 with st.sidebar:
@@ -175,16 +175,16 @@ with tab_clinca:
     subj = st.text_area("Novedades y Subjetivo:", "Paciente estable, sin cambios agudos.")
 
     st.subheader("💊 Infusiones y Drogas")
-    st.caption("Escribe la dosis sólo en las drogas que use. Las que dejes vacías (ej: 'Propofol: ') se borrarán solas en el texto final.")
+    st.caption("Escribe la dosis sólo en las drogas que use. Las vacías se borrarán solas.")
     i1, i2 = st.columns(2)
-    
+
     sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: \nBloq. NM (Atracurio/Rocuronio): "
     sedo = i1.text_area("Sedoanalgesia (PADIS)", sedo_def, height=220)
-    
+
     vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLevosimendan: \nDopamina: \nNTG/NTP: \nLabetalol/Esmolol: "
     vaso = i2.text_area("Vasoactivos/Inotrópicos (AHA/SSC)", vaso_def, height=220)
 
-    st.subheader("💉 Dispositivos")
+    st.subheader("💉 Dispositivos e Invasiones")
     d1, d2, d3, d4 = st.columns(4)
     cvc_info = d1.text_input("CVC (Sitio/Día)")
     ca_info = d2.text_input("Cat. Art. (Sitio/Día)")
@@ -192,6 +192,7 @@ with tab_clinca:
     sng_dias = d4.text_input("SNG (Día)")
 
     st.divider()
+
     st.subheader("1. Neurológico")
     n1, n2, n3, n4 = st.columns(4)
     neuro_estado = n1.text_input("Estado", "Alerta")
@@ -202,22 +203,47 @@ with tab_clinca:
 
     st.subheader("2. Hemodinamia y ECG")
     h1, h2, h3, h4, h5 = st.columns(5)
-    ta = h1.text_input("TA", placeholder="120/80")
-    fc = h2.text_input("FC")
-    fr = h3.text_input("FR")
-    sat = h4.text_input("SatO2")
-    temp = h5.text_input("Temp")
+    ta = h1.text_input("TA (ej: 120/80)", placeholder="120/80")
 
+    # Cálculo y display dinámico de TAM y PP
+    tam_val, pp_val = "", ""
+    if "/" in ta:
+        try:
+            s, d = map(float, ta.split("/"))
+            tam_val = round((s + 2*d)/3)
+            pp_val = int(s - d)
+            st.caption(f"💡 Calculado - TAM: {tam_val} mmHg | PP: {pp_val} mmHg")
+        except: pass
+
+    fc = h2.text_input("FC (lpm)")
+    fr = h3.text_input("FR (rpm)")
+    sat = h4.text_input("SatO2 (%)")
+    temp = h5.text_input("Temp (°C)")
+
+    h6, h7 = st.columns(2)
+    relleno_cap = h6.text_input("Relleno Capilar", "< 2 seg")
+    tdg = h7.text_input("Perfusión periférica (Livideces/TDG)", "Sin livideces")
+
+    # ECG AHA/ACC
+    st.info("📊 Electrocardiograma (AHA/ACC/HRS)")
     e_col1, e_col2, e_col3, e_col4 = st.columns(4)
     ecg_ritmo = e_col1.text_input("Ritmo", "Sinusal")
-    ecg_pr = e_col2.text_input("PR")
-    ecg_qrs_ms = e_col3.text_input("QRS")
-    ecg_qtc = e_col4.text_input("QTc")
-    ex_cv = st.text_area("Ex. CV", "R1 y R2 normofonéticos. Relleno <2seg.")
+    ecg_eje = e_col2.text_input("Eje QRS (°)", "Normoeje")
+    ecg_pr = e_col3.text_input("PR (ms)", placeholder="120-200")
+    ecg_qrs_ms = e_col4.text_input("QRS (ms)", placeholder="<120")
+
+    e_col5, e_col6, e_col7 = st.columns(3)
+    ecg_qtc = e_col5.text_input("QTc (ms)")
+    ecg_st = e_col6.text_input("Segmento ST", "Isonivelado")
+    ecg_onda_t = e_col7.text_input("Onda T", "Normal/Asimétrica")
+
+    ecg_otros = st.text_input("Otros (HVI/HVD, Bloqueos, Ondas Q)", "Sin bloqueos ni ondas Q patológicas.")
+
+    ex_cv = st.text_area("Ex. CV (Auscultación)", "R1 y R2 normofonéticos. Sin soplos ni R3.")
 
     st.subheader("3. Respiratorio (ARM)")
     r1, r2, r3, r4 = st.columns(4)
-    via_aerea = r1.text_input("Vía", "TOT")
+    via_aerea = r1.text_input("Vía Aérea", "TOT")
     modo = r2.text_input("Modo", "VCV")
     fio2 = r3.number_input("FiO2 (%)", 21, 100, 21)
     peep = r4.number_input("PEEP", 0, 30, 5)
@@ -231,14 +257,24 @@ with tab_clinca:
     pafi_manual = r10.text_input("PaFiO2")
     ex_resp = st.text_area("Ex. Resp", "Buena entrada de aire bilateral.")
 
-    st.subheader("4. Abd / Renal / Infecto")
-    ex_abd = st.text_input("Abd", "Blando, depresible.")
-    ex_renal = st.text_input("Renal", "Diuresis conservada.")
-    i_1, i_2, i_3, i_4 = st.columns(4)
-    tmax = i_1.text_input("T.Max")
-    atb1 = i_2.text_input("ATB1")
-    atb2 = i_3.text_input("ATB2")
-    cultivos = i_4.text_input("Cultivos")
+    st.subheader("4. Abdominal y Renal")
+    a1, a2 = st.columns(2)
+    ex_abd = a1.text_area("Abdominal", "Blando, depresible, indoloro.")
+    ex_renal = a2.text_area("Renal/Balance", "Diuresis conservada.")
+
+    st.subheader("5. Infectología y Cultivos (IDSA/SADI)")
+    i_1, i_2, i_3 = st.columns(3)
+    tmax = i_1.text_input("T.Max 24h")
+    atb1 = i_2.text_input("ATB 1 (Día)")
+    atb2 = i_3.text_input("ATB 2 (Día)")
+
+    st.caption("Panel de Cultivos (Solo se imprimirán los que completes)")
+    c_1, c_2 = st.columns(2)
+    cult_hemo = c_1.text_input("Hemocultivos")
+    cult_uro = c_2.text_input("Urocultivo")
+    c_3, c_4 = st.columns(2)
+    cult_resp = c_3.text_input("Respiratorios (BAL/Mini-BAL)")
+    cult_otros = c_4.text_input("Otros (LCR, Catéter, Piel/PB)")
 
 with tab_lab:
     st.subheader("🌬️ EAB")
@@ -270,14 +306,21 @@ with tab_planes:
     analisis, plan = st.text_area("Análisis"), st.text_area("Plan 24hs")
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
-    
-    # 🌟 RUTINA DE AUTO-LIMPIEZA PARA DROGAS 🌟
-    # Filtra y se queda SOLO con las líneas que tienen texto escrito después de los dos puntos ":"
+
+    # 🌟 RUTINA DE AUTO-LIMPIEZA PARA DROGAS
     sedo_clean = " | ".join([line.strip() for line in sedo.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not sedo_clean: sedo_clean = "Sin infusiones."
-    
+
     vaso_clean = " | ".join([line.strip() for line in vaso.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not vaso_clean: vaso_clean = "Sin infusiones."
+
+    # 🌟 RUTINA DE LIMPIEZA PARA CULTIVOS
+    lista_cultivos = []
+    if cult_hemo: lista_cultivos.append(f"Hemo: {cult_hemo}")
+    if cult_uro: lista_cultivos.append(f"Uro: {cult_uro}")
+    if cult_resp: lista_cultivos.append(f"Resp: {cult_resp}")
+    if cult_otros: lista_cultivos.append(f"Otros: {cult_otros}")
+    cultivos_final = " | ".join(lista_cultivos) if lista_cultivos else "Sin cultivos registrados/pendientes."
 
     txt_modulos = ""
     if is_isquemia and any([killip, grace, timi]): txt_modulos += f"\n[+] IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
@@ -296,7 +339,8 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     if is_hda and any([blatchford, rockall]): txt_modulos += f"\n[+] HDA -> Blatchford: {blatchford} | Rockall: {rockall}"
     if is_cid and isth: txt_modulos += f"\n[+] CID -> ISTH: {isth}"
 
-    tam_txt = f"(TAM {round((list(map(float, ta.split('/')))[0]+2*list(map(float, ta.split('/')))[1])/3)})" if "/" in ta else ""
+    # Cálculos dinámicos
+    tam_txt = f"(TAM {round((list(map(float, ta.split('/')))[0]+2*list(map(float, ta.split('/')))[1])/3)} | PP {int(list(map(float, ta.split('/')))[0]-list(map(float, ta.split('/')))[1])})" if "/" in ta else ""
     dp_final = dp_manual or (str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.')))) if pplat and peep else "")
     pafi_final = pafi_manual or (str(int(float(str(po2).replace(',','.')) / (float(fio2)/100))) if po2 and fio2 else "")
 
@@ -317,15 +361,17 @@ Vasoactivos: {vaso_clean}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
 - NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}. {ex_neuro}
-- HEMO: TA {ta} {tam_txt}, FC {fc}, FR {fr}, Sat {sat}%, Temp {temp}°C. 
-- ECG: Ritmo {ecg_ritmo}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms.
+- HEMO: TA {ta} mmHg {tam_txt}, FC {fc} lpm, FR {fr} rpm, Sat {sat}%, Temp {temp}°C.
+  Perfusión: Relleno Capilar {relleno_cap}. {tdg}.
+- ECG (AHA/ACC/HRS): Ritmo {ecg_ritmo}, Eje {ecg_eje}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms. ST: {ecg_st}, Onda T: {ecg_onda_t}. {ecg_otros}
 - CV: {ex_cv}
 - RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep}, PPlat {pplat}, Vt {vt}.
-  Mecánica: P.Pico {ppico} | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}. 
+  Mecánica: P.Pico {ppico} | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}
 - ABD: {ex_abd}
 - RENAL: {ex_renal}
-- INFECTO: Tmax {tmax}°C | ATB: {atb1} / {atb2} | Cultivos: {cultivos.replace(chr(10), ' ')}
+- INFECTO: Tmax {tmax}°C | ATB: {atb1} / {atb2}
+  Cultivos: {cultivos_final}
 
 >> LABORATORIO Y MEDIO INTERNO:
 - EAB: pH {ph} | pCO2 {pco2} | pO2 {po2} | HCO3 {hco3} | EB {eb} | Lac {lactato}
