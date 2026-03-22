@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Hemodinamia Avanzada, Cultivos Estructurados y Auto-Limpieza")
+st.caption("Motor MBE: Hemodinamia, Cultivos y Formato Corregido")
 
 # --- DATOS GENERALES ---
 with st.sidebar:
@@ -205,7 +205,7 @@ with tab_clinca:
     h1, h2, h3, h4, h5 = st.columns(5)
     ta = h1.text_input("TA (ej: 120/80)", placeholder="120/80")
 
-    # Cálculo y display dinámico de TAM y PP
+    # Pre-cálculo visual en pantalla
     tam_val, pp_val = "", ""
     if "/" in ta:
         try:
@@ -224,7 +224,6 @@ with tab_clinca:
     relleno_cap = h6.text_input("Relleno Capilar", "< 2 seg")
     tdg = h7.text_input("Perfusión periférica (Livideces/TDG)", "Sin livideces")
 
-    # ECG AHA/ACC
     st.info("📊 Electrocardiograma (AHA/ACC/HRS)")
     e_col1, e_col2, e_col3, e_col4 = st.columns(4)
     ecg_ritmo = e_col1.text_input("Ritmo", "Sinusal")
@@ -238,7 +237,6 @@ with tab_clinca:
     ecg_onda_t = e_col7.text_input("Onda T", "Normal/Asimétrica")
 
     ecg_otros = st.text_input("Otros (HVI/HVD, Bloqueos, Ondas Q)", "Sin bloqueos ni ondas Q patológicas.")
-
     ex_cv = st.text_area("Ex. CV (Auscultación)", "R1 y R2 normofonéticos. Sin soplos ni R3.")
 
     st.subheader("3. Respiratorio (ARM)")
@@ -301,20 +299,37 @@ with tab_lab:
 
 with tab_planes:
     st.subheader("🛡️ FAST HUG BID")
-    fast_dict = {'F':'Feeding','A':'Analgesia','S':'Sedación','T':'Trombo','H':'Head','U':'Ulcer','G':'Glucemia','B':'Bowel','I':'Invasiones','D':'Drogas'}
-    fast_sel = [f"{k} - {v}" for i, (k, v) in enumerate(fast_dict.items()) if st.columns(5)[i%5].checkbox(k, help=v)]
-    analisis, plan = st.text_area("Análisis"), st.text_area("Plan 24hs")
+
+    # DICCIONARIO CON TEXTOS COMPLETOS PARA LA EVOLUCIÓN
+    fast_dict = {
+        'F': 'Alimentación (Feeding)', 'A': 'Analgesia', 'S': 'Sedación',
+        'T': 'Tromboprofilaxis', 'H': 'Cabecera a 30-45°', 'U': 'Úlceras estrés',
+        'G': 'Control Glucémico', 'B': 'Bowel (Intestino)', 'I': 'Retiro Invasiones', 'D': 'Desescalamiento ATB'
+    }
+
+    # CREACIÓN CORRECTA Y ALINEADA DE LAS COLUMNAS VISUALES
+    f_cols = st.columns(5)
+    fast_sel = []
+    for i, (k, v) in enumerate(fast_dict.items()):
+        # Se asigna cada checkbox a su columna correspondiente sin crear columnas nuevas
+        if f_cols[i % 5].checkbox(k, help=v):
+            fast_sel.append(f"{k} - {v}")
+
+    st.divider()
+    st.subheader("(A/P) Análisis y Plan")
+    analisis = st.text_area("Análisis General")
+    plan = st.text_area("Plan 24hs", "- Cultivar: \n- Imágenes: \n- Interconsultas:")
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
-    # 🌟 RUTINA DE AUTO-LIMPIEZA PARA DROGAS
+    # RUTINA DE AUTO-LIMPIEZA PARA DROGAS
     sedo_clean = " | ".join([line.strip() for line in sedo.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not sedo_clean: sedo_clean = "Sin infusiones."
 
     vaso_clean = " | ".join([line.strip() for line in vaso.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not vaso_clean: vaso_clean = "Sin infusiones."
 
-    # 🌟 RUTINA DE LIMPIEZA PARA CULTIVOS
+    # RUTINA DE LIMPIEZA PARA CULTIVOS
     lista_cultivos = []
     if cult_hemo: lista_cultivos.append(f"Hemo: {cult_hemo}")
     if cult_uro: lista_cultivos.append(f"Uro: {cult_uro}")
@@ -339,10 +354,27 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     if is_hda and any([blatchford, rockall]): txt_modulos += f"\n[+] HDA -> Blatchford: {blatchford} | Rockall: {rockall}"
     if is_cid and isth: txt_modulos += f"\n[+] CID -> ISTH: {isth}"
 
-    # Cálculos dinámicos
-    tam_txt = f"(TAM {round((list(map(float, ta.split('/')))[0]+2*list(map(float, ta.split('/')))[1])/3)} | PP {int(list(map(float, ta.split('/')))[0]-list(map(float, ta.split('/')))[1])})" if "/" in ta else ""
-    dp_final = dp_manual or (str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.')))) if pplat and peep else "")
-    pafi_final = pafi_manual or (str(int(float(str(po2).replace(',','.')) / (float(fio2)/100))) if po2 and fio2 else "")
+    # CÁLCULOS SEGUROS DE HEMODINAMIA Y RESPIRATORIO
+    tam_txt = ""
+    if "/" in ta:
+        try:
+            partes = ta.split("/")
+            s_val, d_val = float(partes[0]), float(partes[1])
+            tam_txt = f"(TAM {round((s_val+2*d_val)/3)} | PP {int(s_val-d_val)})"
+        except: pass
+
+    dp_final = dp_manual
+    if not dp_final and pplat and peep:
+        try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
+        except: pass
+
+    pafi_final = pafi_manual
+    if not pafi_final and po2 and fio2:
+        try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
+        except: pass
+
+    # FORMATO SEGURO DEL FAST HUG
+    fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Int: {dias_int} | Días ARM: {dias_arm}
@@ -382,7 +414,7 @@ Vasoactivos: {vaso_clean}
 - BIOMARCADORES: CPK {cpk} | CPK-MB {cpk_mb} | Tropo I {tropo} | ProBNP {probnp} | LDH {ldh} | PCT {pct}
 
 >> FAST HUG BID:
-{chr(10).join(['  ✓ ' + x for x in fast_sel]) if fast_sel else '  Sin marcar.'}
+{fast_texto}
 
 (A/P) ANÁLISIS Y PLAN:
 {analisis}
