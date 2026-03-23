@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Hemodinamia, Cultivos y Formato Corregido")
+st.caption("Motor MBE: Balance Automático, Nutrición y Copiado Rápido")
 
 # --- DATOS GENERALES ---
 with st.sidebar:
@@ -43,7 +43,6 @@ diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
 diag_norm = re.sub(r'[óöôò]', 'o', diag_norm)
 diag_norm = re.sub(r'[úüûù]', 'u', diag_norm)
 
-# Diccionarios de palabras clave
 kw_isquemia = ["scasest", "iam", "iamcest", "infarto", "angina", "angor", "coronario"]
 kw_ic = ["ic", "insuficiencia cardiaca", "falla cardiaca"]
 kw_fa = ["fa", "fibrilacion auricular", "aleteo", "flutter"]
@@ -255,10 +254,25 @@ with tab_clinca:
     pafi_manual = r10.text_input("PaFiO2")
     ex_resp = st.text_area("Ex. Resp", "Buena entrada de aire bilateral.")
 
-    st.subheader("4. Abdominal y Renal")
-    a1, a2 = st.columns(2)
+    # NUEVO MÓDULO ABDOMINAL, RENAL Y BALANCE HÍDRICO
+    st.subheader("4. Abdominal, Renal y Nutrición")
+    a1, a2, a3 = st.columns(3)
     ex_abd = a1.text_area("Abdominal", "Blando, depresible, indoloro.")
-    ex_renal = a2.text_area("Renal/Balance", "Diuresis conservada.")
+    ex_renal = a2.text_area("Renal / Diuresis", "Diuresis conservada.")
+    nutricion = a3.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral / Dieta blanda", "Oral / Dieta general"])
+
+    st.caption("💧 Balance Hídrico (24hs)")
+    bh1, bh2, bh3 = st.columns(3)
+    ingresos = bh1.text_input("Ingresos Totales (ml)", placeholder="Ej: 2500")
+    egresos = bh2.text_input("Egresos Totales (ml)", placeholder="Ej: 1800")
+
+    # Pre-cálculo visual balance
+    balance_val = ""
+    if ingresos and egresos:
+        try:
+            balance_val = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
+            bh3.info(f"Balance: {balance_val:+.0f} ml")
+        except: pass
 
     st.subheader("5. Infectología y Cultivos (IDSA/SADI)")
     i_1, i_2, i_3 = st.columns(3)
@@ -300,18 +314,15 @@ with tab_lab:
 with tab_planes:
     st.subheader("🛡️ FAST HUG BID")
 
-    # DICCIONARIO CON TEXTOS COMPLETOS PARA LA EVOLUCIÓN
     fast_dict = {
         'F': 'Alimentación (Feeding)', 'A': 'Analgesia', 'S': 'Sedación',
         'T': 'Tromboprofilaxis', 'H': 'Cabecera a 30-45°', 'U': 'Úlceras estrés',
         'G': 'Control Glucémico', 'B': 'Bowel (Intestino)', 'I': 'Retiro Invasiones', 'D': 'Desescalamiento ATB'
     }
 
-    # CREACIÓN CORRECTA Y ALINEADA DE LAS COLUMNAS VISUALES
     f_cols = st.columns(5)
     fast_sel = []
     for i, (k, v) in enumerate(fast_dict.items()):
-        # Se asigna cada checkbox a su columna correspondiente sin crear columnas nuevas
         if f_cols[i % 5].checkbox(k, help=v):
             fast_sel.append(f"{k} - {v}")
 
@@ -322,14 +333,14 @@ with tab_planes:
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
-    # RUTINA DE AUTO-LIMPIEZA PARA DROGAS
+    # Limpieza drogas
     sedo_clean = " | ".join([line.strip() for line in sedo.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not sedo_clean: sedo_clean = "Sin infusiones."
 
     vaso_clean = " | ".join([line.strip() for line in vaso.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not vaso_clean: vaso_clean = "Sin infusiones."
 
-    # RUTINA DE LIMPIEZA PARA CULTIVOS
+    # Limpieza cultivos
     lista_cultivos = []
     if cult_hemo: lista_cultivos.append(f"Hemo: {cult_hemo}")
     if cult_uro: lista_cultivos.append(f"Uro: {cult_uro}")
@@ -337,6 +348,7 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     if cult_otros: lista_cultivos.append(f"Otros: {cult_otros}")
     cultivos_final = " | ".join(lista_cultivos) if lista_cultivos else "Sin cultivos registrados/pendientes."
 
+    # Textos condicionales
     txt_modulos = ""
     if is_isquemia and any([killip, grace, timi]): txt_modulos += f"\n[+] IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
     if is_ic and any([nyha, stevenson, aha_ic]): txt_modulos += f"\n[+] IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
@@ -354,7 +366,7 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     if is_hda and any([blatchford, rockall]): txt_modulos += f"\n[+] HDA -> Blatchford: {blatchford} | Rockall: {rockall}"
     if is_cid and isth: txt_modulos += f"\n[+] CID -> ISTH: {isth}"
 
-    # CÁLCULOS SEGUROS DE HEMODINAMIA Y RESPIRATORIO
+    # Cálculos seguros
     tam_txt = ""
     if "/" in ta:
         try:
@@ -373,7 +385,15 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
         try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
         except: pass
 
-    # FORMATO SEGURO DEL FAST HUG
+    # Lógica de Balance en Texto
+    balance_txt = ""
+    if ingresos and egresos:
+        try:
+            bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
+            balance_txt = f" | Ingresos: {ingresos}ml / Egresos: {egresos}ml (Balance 24h: {bal:+.0f} ml)"
+        except: pass
+
+    nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
     fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
@@ -400,8 +420,8 @@ Vasoactivos: {vaso_clean}
 - RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep}, PPlat {pplat}, Vt {vt}.
   Mecánica: P.Pico {ppico} | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}
-- ABD: {ex_abd}
-- RENAL: {ex_renal}
+- ABD Y NUTRICIÓN: {ex_abd}{nutri_txt}
+- RENAL Y BALANCE: {ex_renal}{balance_txt}
 - INFECTO: Tmax {tmax}°C | ATB: {atb1} / {atb2}
   Cultivos: {cultivos_final}
 
@@ -421,5 +441,7 @@ Vasoactivos: {vaso_clean}
 PLAN:
 {plan}
 """
-    st.subheader("📋 Resultado para copiar:")
-    st.text_area("Final:", texto_final, height=500)
+    # 🌟 EL NUEVO BOTÓN DE COPIADO MÁGICO 🌟
+    st.subheader("📋 Resultado listo para GECLISA:")
+    st.info("Pasa el mouse sobre el cuadro de abajo y haz clic en el botón de copiar (📝) en la esquina superior derecha.")
+    st.code(texto_final, language="markdown")
