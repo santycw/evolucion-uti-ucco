@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Hemodinamia, Cultivos y Formato Corregido")
+st.caption("Motor MBE: Balance, Nutrición y Laboratorio con Unidades Convencionales")
 
 # --- DATOS GENERALES ---
 with st.sidebar:
@@ -43,7 +43,6 @@ diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
 diag_norm = re.sub(r'[óöôò]', 'o', diag_norm)
 diag_norm = re.sub(r'[úüûù]', 'u', diag_norm)
 
-# Diccionarios de palabras clave
 kw_isquemia = ["scasest", "iam", "iamcest", "infarto", "angina", "angor", "coronario"]
 kw_ic = ["ic", "insuficiencia cardiaca", "falla cardiaca"]
 kw_fa = ["fa", "fibrilacion auricular", "aleteo", "flutter"]
@@ -177,10 +176,10 @@ with tab_clinca:
     st.subheader("💊 Infusiones y Drogas")
     st.caption("Escribe la dosis sólo en las drogas que use. Las vacías se borrarán solas.")
     i1, i2 = st.columns(2)
-
+    
     sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: \nBloq. NM (Atracurio/Rocuronio): "
     sedo = i1.text_area("Sedoanalgesia (PADIS)", sedo_def, height=220)
-
+    
     vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLevosimendan: \nDopamina: \nNTG/NTP: \nLabetalol/Esmolol: "
     vaso = i2.text_area("Vasoactivos/Inotrópicos (AHA/SSC)", vaso_def, height=220)
 
@@ -192,7 +191,7 @@ with tab_clinca:
     sng_dias = d4.text_input("SNG (Día)")
 
     st.divider()
-
+    
     st.subheader("1. Neurológico")
     n1, n2, n3, n4 = st.columns(4)
     neuro_estado = n1.text_input("Estado", "Alerta")
@@ -204,8 +203,7 @@ with tab_clinca:
     st.subheader("2. Hemodinamia y ECG")
     h1, h2, h3, h4, h5 = st.columns(5)
     ta = h1.text_input("TA (ej: 120/80)", placeholder="120/80")
-
-    # Pre-cálculo visual en pantalla
+    
     tam_val, pp_val = "", ""
     if "/" in ta:
         try:
@@ -244,28 +242,41 @@ with tab_clinca:
     via_aerea = r1.text_input("Vía Aérea", "TOT")
     modo = r2.text_input("Modo", "VCV")
     fio2 = r3.number_input("FiO2 (%)", 21, 100, 21)
-    peep = r4.number_input("PEEP", 0, 30, 5)
+    peep = r4.number_input("PEEP (cmH2O)", 0, 30, 5)
     r5, r6, r7, r8 = st.columns(4)
-    ppico = r5.text_input("P.Pico")
-    pplat = r6.text_input("P.Plateau")
-    comp = r7.text_input("Comp.")
-    vt = r8.text_input("Vt")
+    ppico = r5.text_input("P.Pico (cmH2O)")
+    pplat = r6.text_input("P.Plateau (cmH2O)")
+    comp = r7.text_input("Comp. (ml/cmH2O)")
+    vt = r8.text_input("Vt (ml)")
     r9, r10 = st.columns(2)
-    dp_manual = r9.text_input("Driving P.")
+    dp_manual = r9.text_input("Driving P. (cmH2O)")
     pafi_manual = r10.text_input("PaFiO2")
     ex_resp = st.text_area("Ex. Resp", "Buena entrada de aire bilateral.")
 
-    st.subheader("4. Abdominal y Renal")
-    a1, a2 = st.columns(2)
+    st.subheader("4. Abdominal, Renal y Nutrición")
+    a1, a2, a3 = st.columns(3)
     ex_abd = a1.text_area("Abdominal", "Blando, depresible, indoloro.")
-    ex_renal = a2.text_area("Renal/Balance", "Diuresis conservada.")
+    ex_renal = a2.text_area("Renal / Diuresis", "Diuresis conservada.")
+    nutricion = a3.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral / Dieta blanda", "Oral / Dieta general"])
+
+    st.caption("💧 Balance Hídrico (24hs)")
+    bh1, bh2, bh3 = st.columns(3)
+    ingresos = bh1.text_input("Ingresos Totales (ml)", placeholder="Ej: 2500")
+    egresos = bh2.text_input("Egresos Totales (ml)", placeholder="Ej: 1800")
+    
+    balance_val = ""
+    if ingresos and egresos:
+        try:
+            balance_val = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
+            bh3.info(f"Balance: {balance_val:+.0f} ml")
+        except: pass
 
     st.subheader("5. Infectología y Cultivos (IDSA/SADI)")
     i_1, i_2, i_3 = st.columns(3)
-    tmax = i_1.text_input("T.Max 24h")
+    tmax = i_1.text_input("T.Max 24h (°C)")
     atb1 = i_2.text_input("ATB 1 (Día)")
     atb2 = i_3.text_input("ATB 2 (Día)")
-
+    
     st.caption("Panel de Cultivos (Solo se imprimirán los que completes)")
     c_1, c_2 = st.columns(2)
     cult_hemo = c_1.text_input("Hemocultivos")
@@ -275,43 +286,75 @@ with tab_clinca:
     cult_otros = c_4.text_input("Otros (LCR, Catéter, Piel/PB)")
 
 with tab_lab:
-    st.subheader("🌬️ EAB")
+    st.subheader("🌬️ EAB (Estado Ácido-Base)")
     e1, e2, e3, e4, e5, e6 = st.columns(6)
-    ph, pco2, po2, hco3, eb, lactato = e1.text_input("pH"), e2.text_input("pCO2"), e3.text_input("pO2"), e4.text_input("HCO3"), e5.text_input("EB"), e6.text_input("Lactato")
+    ph = e1.text_input("pH")
+    pco2 = e2.text_input("pCO2 (mmHg)")
+    po2 = e3.text_input("pO2 (mmHg)")
+    hco3 = e4.text_input("HCO3 (mEq/L)")
+    eb = e5.text_input("EB (mEq/L)")
+    lactato = e6.text_input("Lactato (mmol/L)")
 
     st.subheader("🩸 Hemograma y Coagulograma")
     l1, l2, l3, l4 = st.columns(4)
-    hb, hto, gb, plaq = l1.text_input("Hb"), l2.text_input("Hto"), l3.text_input("GB"), l4.text_input("Plaq")
+    hb = l1.text_input("Hb (g/dL)")
+    hto = l2.text_input("Hto (%)")
+    gb = l3.text_input("GB (/mm³)")
+    plaq = l4.text_input("Plaq (/mm³)")
+    
+    st.caption("Fórmula Leucocitaria")
     f1, f2, f3, f4 = st.columns(4)
-    neut, linf, mono, eos = f1.text_input("Neut%"), f2.text_input("Linf%"), f3.text_input("Mono%"), f4.text_input("Eos%")
+    neut = f1.text_input("Neut (%)")
+    linf = f2.text_input("Linf (%)")
+    mono = f3.text_input("Mono (%)")
+    eos = f4.text_input("Eos (%)")
+    
+    st.caption("Coagulograma")
     c1, c2, c3 = st.columns(3)
-    app, kptt, rin = c1.text_input("APP"), c2.text_input("KPTT"), c3.text_input("RIN")
+    app = c1.text_input("APP (%)")
+    kptt = c2.text_input("KPTT (seg)")
+    rin = c3.text_input("RIN")
 
     st.subheader("🧪 Química y Hepatograma")
     q1, q2, q3, q4, q5, q6, q7 = st.columns(7)
-    urea, cr, na, k, cl, mg, ca = q1.text_input("Urea"), q2.text_input("Cr"), q3.text_input("Na"), q4.text_input("K"), q5.text_input("Cl"), q6.text_input("Mg"), q7.text_input("Ca")
+    urea = q1.text_input("Urea (mg/dL)")
+    cr = q2.text_input("Cr (mg/dL)")
+    na = q3.text_input("Na (mEq/L)")
+    k = q4.text_input("K (mEq/L)")
+    cl = q5.text_input("Cl (mEq/L)")
+    mg = q6.text_input("Mg (mg/dL)")
+    ca = q7.text_input("Ca (mg/dL)")
+    
+    st.caption("Hepatograma")
     he1, he2, he3, he4, he5, he6 = st.columns(6)
-    bt, bd, got, gpt, fal, ggt = he1.text_input("BT"), he2.text_input("BD"), he3.text_input("GOT"), he4.text_input("GPT"), he5.text_input("FAL"), he6.text_input("GGT")
+    bt = he1.text_input("BT (mg/dL)")
+    bd = he2.text_input("BD (mg/dL)")
+    got = he3.text_input("GOT (UI/L)")
+    gpt = he4.text_input("GPT (UI/L)")
+    fal = he5.text_input("FAL (UI/L)")
+    ggt = he6.text_input("GGT (UI/L)")
 
     st.subheader("🧬 Biomarcadores")
     b1, b2, b3, b4, b5, b6 = st.columns(6)
-    cpk, cpk_mb, tropo, probnp, ldh, pct = b1.text_input("CPK"), b2.text_input("CPK-MB"), b3.text_input("Tropo I"), b4.text_input("ProBNP"), b5.text_input("LDH"), b6.text_input("PCT")
+    cpk = b1.text_input("CPK (UI/L)")
+    cpk_mb = b2.text_input("CPK-MB (UI/L)")
+    tropo = b3.text_input("Tropo I (ng/mL)")
+    probnp = b4.text_input("ProBNP (pg/mL)")
+    ldh = b5.text_input("LDH (UI/L)")
+    pct = b6.text_input("PCT (ng/mL)")
 
 with tab_planes:
     st.subheader("🛡️ FAST HUG BID")
-
-    # DICCIONARIO CON TEXTOS COMPLETOS PARA LA EVOLUCIÓN
+    
     fast_dict = {
         'F': 'Alimentación (Feeding)', 'A': 'Analgesia', 'S': 'Sedación',
         'T': 'Tromboprofilaxis', 'H': 'Cabecera a 30-45°', 'U': 'Úlceras estrés',
         'G': 'Control Glucémico', 'B': 'Bowel (Intestino)', 'I': 'Retiro Invasiones', 'D': 'Desescalamiento ATB'
     }
-
-    # CREACIÓN CORRECTA Y ALINEADA DE LAS COLUMNAS VISUALES
+    
     f_cols = st.columns(5)
     fast_sel = []
     for i, (k, v) in enumerate(fast_dict.items()):
-        # Se asigna cada checkbox a su columna correspondiente sin crear columnas nuevas
         if f_cols[i % 5].checkbox(k, help=v):
             fast_sel.append(f"{k} - {v}")
 
@@ -321,15 +364,13 @@ with tab_planes:
     plan = st.text_area("Plan 24hs", "- Cultivar: \n- Imágenes: \n- Interconsultas:")
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
-
-    # RUTINA DE AUTO-LIMPIEZA PARA DROGAS
+    
     sedo_clean = " | ".join([line.strip() for line in sedo.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not sedo_clean: sedo_clean = "Sin infusiones."
-
+    
     vaso_clean = " | ".join([line.strip() for line in vaso.split('\n') if line.strip() and not line.strip().endswith(':')])
     if not vaso_clean: vaso_clean = "Sin infusiones."
 
-    # RUTINA DE LIMPIEZA PARA CULTIVOS
     lista_cultivos = []
     if cult_hemo: lista_cultivos.append(f"Hemo: {cult_hemo}")
     if cult_uro: lista_cultivos.append(f"Uro: {cult_uro}")
@@ -354,7 +395,6 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     if is_hda and any([blatchford, rockall]): txt_modulos += f"\n[+] HDA -> Blatchford: {blatchford} | Rockall: {rockall}"
     if is_cid and isth: txt_modulos += f"\n[+] CID -> ISTH: {isth}"
 
-    # CÁLCULOS SEGUROS DE HEMODINAMIA Y RESPIRATORIO
     tam_txt = ""
     if "/" in ta:
         try:
@@ -373,7 +413,14 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
         try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
         except: pass
 
-    # FORMATO SEGURO DEL FAST HUG
+    balance_txt = ""
+    if ingresos and egresos:
+        try:
+            bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
+            balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance 24h: {bal:+.0f} ml)"
+        except: pass
+
+    nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
     fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
@@ -393,25 +440,25 @@ Vasoactivos: {vaso_clean}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
 - NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}. {ex_neuro}
-- HEMO: TA {ta} mmHg {tam_txt}, FC {fc} lpm, FR {fr} rpm, Sat {sat}%, Temp {temp}°C.
+- HEMO: TA {ta} mmHg {tam_txt}, FC {fc} lpm, FR {fr} rpm, Sat {sat}%, Temp {temp}°C. 
   Perfusión: Relleno Capilar {relleno_cap}. {tdg}.
 - ECG (AHA/ACC/HRS): Ritmo {ecg_ritmo}, Eje {ecg_eje}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms. ST: {ecg_st}, Onda T: {ecg_onda_t}. {ecg_otros}
 - CV: {ex_cv}
-- RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep}, PPlat {pplat}, Vt {vt}.
-  Mecánica: P.Pico {ppico} | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}.
+- RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
+  Mecánica: P.Pico {ppico} cmH2O | Comp {comp} ml/cmH2O | DP {dp_final} cmH2O | PaFiO2 {pafi_final}. 
   Examen: {ex_resp}
-- ABD: {ex_abd}
-- RENAL: {ex_renal}
+- ABD Y NUTRICIÓN: {ex_abd}{nutri_txt}
+- RENAL Y BALANCE: {ex_renal}{balance_txt}
 - INFECTO: Tmax {tmax}°C | ATB: {atb1} / {atb2}
   Cultivos: {cultivos_final}
 
 >> LABORATORIO Y MEDIO INTERNO:
-- EAB: pH {ph} | pCO2 {pco2} | pO2 {po2} | HCO3 {hco3} | EB {eb} | Lac {lactato}
-- HEMOGRAMA: Hb {hb} | Hto {hto} | GB {gb} (N:{neut}% L:{linf}% M:{mono}% E:{eos}%) | Plaq {plaq}
-- COAGULOGRAMA: TP/APP {app} | KPTT {kptt} | RIN {rin}
-- QUÍMICA: Urea {urea} | Cr {cr} | Na {na} | K {k} | Cl {cl} | Mg {mg} | Ca {ca}
-- HEPATOGRAMA: BT {bt} | BD {bd} | GOT {got} | GPT {gpt} | FAL {fal} | GGT {ggt}
-- BIOMARCADORES: CPK {cpk} | CPK-MB {cpk_mb} | Tropo I {tropo} | ProBNP {probnp} | LDH {ldh} | PCT {pct}
+- EAB: pH {ph} | pCO2 {pco2} mmHg | pO2 {po2} mmHg | HCO3 {hco3} mEq/L | EB {eb} mEq/L | Lac {lactato} mmol/L
+- HEMOGRAMA: Hb {hb} g/dL | Hto {hto} % | GB {gb} /mm³ (N:{neut}% L:{linf}% M:{mono}% E:{eos}%) | Plaq {plaq} /mm³
+- COAGULOGRAMA: TP/APP {app} % | KPTT {kptt} seg | RIN {rin}
+- QUÍMICA: Urea {urea} mg/dL | Cr {cr} mg/dL | Na {na} mEq/L | K {k} mEq/L | Cl {cl} mEq/L | Mg {mg} mg/dL | Ca {ca} mg/dL
+- HEPATOGRAMA: BT {bt} mg/dL | BD {bd} mg/dL | GOT {got} UI/L | GPT {gpt} UI/L | FAL {fal} UI/L | GGT {ggt} UI/L
+- BIOMARCADORES: CPK {cpk} UI/L | CPK-MB {cpk_mb} UI/L | Tropo I {tropo} ng/mL | ProBNP {probnp} pg/mL | LDH {ldh} UI/L | PCT {pct} ng/mL
 
 >> FAST HUG BID:
 {fast_texto}
@@ -421,5 +468,6 @@ Vasoactivos: {vaso_clean}
 PLAN:
 {plan}
 """
-    st.subheader("📋 Resultado para copiar:")
-    st.text_area("Final:", texto_final, height=500)
+    st.subheader("📋 Resultado listo para GECLISA:")
+    st.info("Pasa el mouse sobre el cuadro de abajo y haz clic en el botón de copiar (📝) en la esquina superior derecha.")
+    st.code(texto_final, language="markdown")
