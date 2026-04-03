@@ -1,5 +1,7 @@
 import streamlit as st
 import re
+import json
+import os
 
 st.set_page_config(page_title="Evolución UTI/UCCO", page_icon="🏥", layout="wide")
 
@@ -11,7 +13,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Tesauro Clínico Estricto (MeSH/DeCS/SEDOM) y Regex")
+st.caption("Motor MBE: Diccionario Local, Auto-Unidades y Copiado Rápido")
 
 # --- DATOS GENERALES Y DIAGNÓSTICO (PANEL LATERAL) ---
 with st.sidebar:
@@ -24,7 +26,7 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico Principal")
     diagnostico = st.text_area("Diagnósticos (Activan scores automáticos):", "1. \n2. ", height=150)
-    st.caption("💡 Soporta siglas oficiales: SCA, SCACEST, IAM, IC, EAP, FA, AKI, IRA, ACV, TIA, HSA, NAC, EPOC, AEEPOC, TEP, HDA, CID, etc.")
+    st.caption("💡 El sistema lee la base de datos local para detectar terminología clínica oficial (SCA, EAP, AKI, etc).")
 
 # --- INICIALIZACIÓN DE SCORES ---
 sofa = qsofa = apache = ""
@@ -37,60 +39,75 @@ curb65 = psi = gold = ""
 wells_tep = pesi = wells_tvp = ""
 blatchford = rockall = isth = ""
 
-# --- INTELIGENCIA SEMÁNTICA Y TESAURO CLÍNICO ---
+# --- CONEXIÓN A BASE DE DATOS LOCAL (CON SISTEMA DE SEGURIDAD/FALLBACK) ---
+@st.cache_data
+def cargar_diccionario_medico():
+    ruta_db = "diccionario.json"
+    # Diccionario de respaldo interno por si el archivo json no se encuentra
+    fallback_db = {
+        "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario", "isquemia", "sme coronario", "sindrome coronario"],
+        "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "edema agudo de pulmon", "cor pulmonale", "disfuncion ventricular"],
+        "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "taquiarritmia", "arritmia completa"],
+        "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia", "infeccion severa", "foco infeccioso"],
+        "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia", "fracaso renal", "uremia", "lesion renal"],
+        "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "insuficiencia hepatica", "encefalopatia", "ascitis"],
+        "pancreas": ["pancreatitis", "pa", "necrosis pancreatica"],
+        "acv": ["acv", "ictus", "stroke", "isquemico", "hemorragico", "ataque cerebrovascular", "accidente cerebrovascular", "ait", "tia"],
+        "hsa": ["hsa", "hemorragia subaracnoidea", "aneurisma", "hemorragia cerebral", "hematoma intraparenquimatoso", "hip"],
+        "nac": ["nac", "neumonia", "pulmonia", "infeccion respiratoria", "bronconeumonia", "nn", "nih"],
+        "epoc": ["epoc", "bronquitis cronica", "enfisema", "aeepoc", "exacerbacion epoc"],
+        "tep": ["tep", "tromboembolismo", "embolia pulmonar", "tepa"],
+        "tvp": ["tvp", "trombosis venosa", "trombosis profunda", "etv"],
+        "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis", "enterorragia", "hematoquecia", "sangrado digestivo"],
+        "cid": ["cid", "coagulacion intravascular diseminada", "coagulopatia"]
+    }
+
+    if os.path.exists(ruta_db):
+        try:
+            with open(ruta_db, "r", encoding="utf-8") as archivo:
+                return json.load(archivo)
+        except: return fallback_db
+    else:
+        return fallback_db
+
+db_terminologia = cargar_diccionario_medico()
+
+# --- INTELIGENCIA SEMÁNTICA (REGEX MESH/DECS) ---
 diag_norm = diagnostico.lower()
-# Normalización de acentos para no fallar si el médico escribe rápido
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
 diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
 diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
 diag_norm = re.sub(r'[óöôò]', 'o', diag_norm)
 diag_norm = re.sub(r'[úüûù]', 'u', diag_norm)
 
-# DICCIONARIOS DE TERMINOLOGÍA (DeCS, MeSH, SEDOM, UpToDate, RANME)
-kw_isquemia = ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario", "isquemia", "sme coronario", "sindrome coronario"]
-kw_ic = ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "edema agudo de pulmon", "cor pulmonale", "disfuncion ventricular"]
-kw_fa = ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "taquiarritmia", "arritmia completa"]
-kw_sepsis = ["sepsis", "septic", "shock", "sirs", "bacteriemia", "infeccion severa", "foco infeccioso", "infeccion del torrente sanguineo"]
-kw_renal = ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia", "fracaso renal", "uremia", "lesion renal"]
-kw_hepato = ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "insuficiencia hepatica", "encefalopatia", "ascitis"]
-kw_pancreas = ["pancreatitis", "pa", "necrosis pancreatica"]
-kw_acv = ["acv", "ictus", "stroke", "isquemico", "hemorragico", "ataque cerebrovascular", "accidente cerebrovascular", "ait", "tia"]
-kw_hsa = ["hsa", "hemorragia subaracnoidea", "aneurisma", "hemorragia cerebral", "hematoma intraparenquimatoso", "hip"]
-kw_nac = ["nac", "neumonia", "pulmonia", "infeccion respiratoria", "bronconeumonia", "nn", "nih"]
-kw_epoc = ["epoc", "bronquitis cronica", "enfisema", "aeepoc", "exacerbacion epoc"]
-kw_tep = ["tep", "tromboembolismo", "embolia pulmonar", "tepa"]
-kw_tvp = ["tvp", "trombosis venosa", "trombosis profunda", "etv"]
-kw_hda = ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis", "enterorragia", "hematoquecia", "sangrado digestivo"]
-kw_cid = ["cid", "coagulacion intravascular diseminada", "coagulopatia"]
-
-# MOTOR DE BÚSQUEDA ESTRICTO (Regex con límites de palabra \b)
-def detectar_diagnostico(keywords, texto):
-    # Esto asegura que busque palabras exactas. "sca" activará el score, pero "pescado" o "buscar" NO.
+def detectar_en_db(categoria, texto):
+    keywords = db_terminologia.get(categoria, [])
+    if not keywords: return False
     patron = r'\b(?:' + '|'.join(re.escape(kw) for kw in keywords) + r')\b'
     return bool(re.search(patron, texto))
 
-is_isquemia = detectar_diagnostico(kw_isquemia, diag_norm)
-is_ic = detectar_diagnostico(kw_ic, diag_norm)
-is_fa = detectar_diagnostico(kw_fa, diag_norm)
-is_sepsis = detectar_diagnostico(kw_sepsis, diag_norm)
-is_renal = detectar_diagnostico(kw_renal, diag_norm)
-is_hepato = detectar_diagnostico(kw_hepato, diag_norm)
-is_pancreas = detectar_diagnostico(kw_pancreas, diag_norm)
-is_acv = detectar_diagnostico(kw_acv, diag_norm)
-is_hsa = detectar_diagnostico(kw_hsa, diag_norm)
-is_nac = detectar_diagnostico(kw_nac, diag_norm)
-is_epoc = detectar_diagnostico(kw_epoc, diag_norm)
-is_tep = detectar_diagnostico(kw_tep, diag_norm)
-is_tvp = detectar_diagnostico(kw_tvp, diag_norm)
-is_hda = detectar_diagnostico(kw_hda, diag_norm)
-is_cid = detectar_diagnostico(kw_cid, diag_norm)
+is_isquemia = detectar_en_db("isquemia", diag_norm)
+is_ic       = detectar_en_db("ic", diag_norm)
+is_fa       = detectar_en_db("fa", diag_norm)
+is_sepsis   = detectar_en_db("sepsis", diag_norm)
+is_renal    = detectar_en_db("renal", diag_norm)
+is_hepato   = detectar_en_db("hepato", diag_norm)
+is_pancreas = detectar_en_db("pancreas", diag_norm)
+is_acv      = detectar_en_db("acv", diag_norm)
+is_hsa      = detectar_en_db("hsa", diag_norm)
+is_nac      = detectar_en_db("nac", diag_norm)
+is_epoc     = detectar_en_db("epoc", diag_norm)
+is_tep      = detectar_en_db("tep", diag_norm)
+is_tvp      = detectar_en_db("tvp", diag_norm)
+is_hda      = detectar_en_db("hda", diag_norm)
+is_cid      = detectar_en_db("cid", diag_norm)
 
 # --- MÓDULOS DE GUÍAS INTERNACIONALES ---
 if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
-    st.markdown("### ⚙️ Scores Médicos Activados (Basado en Diagnóstico)")
+    st.markdown("### ⚙️ Scores Médicos Activados")
 
 if is_isquemia:
-    with st.expander("🫀 SCASEST / IAM (AHA/ESC)", expanded=True):
+    with st.expander("🫀 Síndrome Coronario Agudo (SCA) / IAM (AHA/ESC)", expanded=True):
         c1, c2, c3 = st.columns(3)
         killip = c1.selectbox("Killip y Kimball", ["", "I (Sin IC)", "II (R3/Estertores)", "III (EAP)", "IV (Shock)"])
         grace = c2.text_input("GRACE (% Mort)")
@@ -375,6 +392,7 @@ with tab_planes:
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
+    # DICCIONARIO INTELIGENTE DE UNIDADES (Motor de Inserción)
     dict_unidades = {
         "Fentanilo": "gammas/h",
         "Remifentanilo": "gammas/kg/min",
@@ -421,7 +439,7 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     cultivos_final = " | ".join(lista_cultivos) if lista_cultivos else "Sin cultivos registrados/pendientes."
 
     txt_modulos = ""
-    if is_isquemia and any([killip, grace, timi]): txt_modulos += f"\n[+] IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
+    if is_isquemia and any([killip, grace, timi]): txt_modulos += f"\n[+] SCA/IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
     if is_ic and any([nyha, stevenson, aha_ic]): txt_modulos += f"\n[+] IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
     if is_fa and any([cha2ds2, hasbled]): txt_modulos += f"\n[+] FA -> CHA2DS2-VASc: {cha2ds2} | HAS-BLED: {hasbled}"
     if is_sepsis and any([qsofa, sofa, apache]): txt_modulos += f"\n[+] SEPSIS -> qSOFA: {qsofa} | SOFA: {sofa} | APACHE: {apache}"
