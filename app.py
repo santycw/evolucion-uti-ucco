@@ -13,20 +13,25 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Diccionario Local, Auto-Unidades y Copiado Rápido")
+st.caption("Motor MBE: Diccionario Local, Auto-Unidades y Renderizado Condicional ARM")
 
 # --- DATOS GENERALES Y DIAGNÓSTICO (PANEL LATERAL) ---
 with st.sidebar:
     st.header("📌 Datos de Base")
     dias_int_hosp = st.text_input("Días Int. (Hospital)")
     dias_int_uti = st.text_input("Días Int. (UTI/UCCO)")
-    dias_arm = st.text_input("Días ARM")
+    dias_arm = st.text_input("Días ARM", placeholder="Ej: 0, 1, 5...")
 
     st.divider()
 
     st.header("📋 Diagnóstico Principal")
     diagnostico = st.text_area("Diagnósticos (Activan scores automáticos):", "1. \n2. ", height=150)
     st.caption("💡 El sistema lee la base de datos local para detectar terminología clínica oficial (SCA, EAP, AKI, etc).")
+
+# --- VARIABLE CONDICIONAL: PACIENTE VENTILADO ---
+# Si dias_arm tiene texto y NO es "0", "no" o "-", consideramos que está ventilado.
+d_arm_limpio = dias_arm.strip().lower()
+paciente_ventilado = bool(d_arm_limpio and d_arm_limpio not in ["0", "-", "no"])
 
 # --- INICIALIZACIÓN DE SCORES ---
 sofa = qsofa = apache = ""
@@ -39,11 +44,10 @@ curb65 = psi = gold = ""
 wells_tep = pesi = wells_tvp = ""
 blatchford = rockall = isth = ""
 
-# --- CONEXIÓN A BASE DE DATOS LOCAL (CON SISTEMA DE SEGURIDAD/FALLBACK) ---
+# --- CONEXIÓN A BASE DE DATOS LOCAL (CON FALLBACK) ---
 @st.cache_data
 def cargar_diccionario_medico():
     ruta_db = "diccionario.json"
-    # Diccionario de respaldo interno por si el archivo json no se encuentra
     fallback_db = {
         "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario", "isquemia", "sme coronario", "sindrome coronario"],
         "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "edema agudo de pulmon", "cor pulmonale", "disfuncion ventricular"],
@@ -264,21 +268,37 @@ with tab_clinca:
     ecg_otros = st.text_input("Otros (HVI/HVD, Bloqueos, Ondas Q)", "Sin bloqueos ni ondas Q patológicas.")
     ex_cv = st.text_area("Ex. CV (Auscultación)", "R1 y R2 normofonéticos. Sin soplos ni R3.")
 
-    st.subheader("3. Respiratorio (ARM)")
-    r1, r2, r3, r4 = st.columns(4)
-    via_aerea = r1.text_input("Vía Aérea", "TOT")
-    modo = r2.text_input("Modo", "VCV")
-    fio2 = r3.number_input("FiO2 (%)", 21, 100, 21)
-    peep = r4.number_input("PEEP (cmH2O)", 0, 30, 5)
-    r5, r6, r7, r8 = st.columns(4)
-    ppico = r5.text_input("P.Pico (cmH2O)")
-    pplat = r6.text_input("P.Plateau (cmH2O)")
-    comp = r7.text_input("Comp. (ml/cmH2O)")
-    vt = r8.text_input("Vt (ml)")
-    r9, r10 = st.columns(2)
-    dp_manual = r9.text_input("Driving P. (cmH2O)")
-    pafi_manual = r10.text_input("PaFiO2")
-    ex_resp = st.text_area("Ex. Resp", "Buena entrada de aire bilateral.")
+    # --- MÓDULO RESPIRATORIO CONDICIONAL ---
+    st.subheader("3. Respiratorio")
+
+    # Datos básicos siempre visibles
+    r_b1, r_b2, r_b3 = st.columns(3)
+    if paciente_ventilado:
+        via_aerea = r_b1.text_input("Vía Aérea", "TOT")
+    else:
+        via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Reservorio", "CAF", "VNI", "TQTAA"])
+
+    fio2 = r_b2.number_input("FiO2 (%)", 21, 100, 21)
+    pafi_manual = r_b3.text_input("PaFiO2 (Opcional)")
+
+    # Inicializamos las variables de ARM vacías por seguridad
+    modo = peep = ppico = pplat = comp = vt = dp_manual = ""
+
+    # Consola avanzada solo si está ventilado
+    if paciente_ventilado:
+        st.success("⚙️ Consola de Mecánica Respiratoria (Activado por 'Días ARM')")
+        r1, r2, r3, r4 = st.columns(4)
+        modo = r1.text_input("Modo", "VCV")
+        peep = r2.number_input("PEEP (cmH2O)", 0, 30, 5)
+        vt = r3.text_input("Vt (ml)")
+        dp_manual = r4.text_input("Driving P. (cmH2O)")
+
+        r5, r6, r7 = st.columns(3)
+        ppico = r5.text_input("P.Pico (cmH2O)")
+        pplat = r6.text_input("P.Plateau (cmH2O)")
+        comp = r7.text_input("Comp. (ml/cmH2O)")
+
+    ex_resp = st.text_area("Examen Respiratorio", "Buena entrada de aire bilateral. Murmullo vesicular conservado sin ruidos agregados.")
 
     st.subheader("4. Abdominal, Renal y Nutrición")
     a1, a2, a3 = st.columns(3)
@@ -392,7 +412,6 @@ with tab_planes:
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
-    # DICCIONARIO INTELIGENTE DE UNIDADES (Motor de Inserción)
     dict_unidades = {
         "Fentanilo": "gammas/h",
         "Remifentanilo": "gammas/kg/min",
@@ -463,15 +482,26 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
             tam_txt = f"(TAM {round((s_val+2*d_val)/3)} | PP {int(s_val-d_val)})"
         except: pass
 
-    dp_final = dp_manual
-    if not dp_final and pplat and peep:
-        try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
-        except: pass
-
+    # Cálculo Automático de PaFiO2 general
     pafi_final = pafi_manual
     if not pafi_final and po2 and fio2:
         try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
         except: pass
+
+    # CONSTRUCCIÓN DE TEXTO RESPIRATORIO
+    if paciente_ventilado:
+        dp_final = dp_manual
+        if not dp_final and pplat and peep:
+            try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
+            except: pass
+
+        texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
+  Mecánica: P.Pico {ppico} cmH2O | Comp {comp} ml/cmH2O | DP {dp_final} cmH2O | PaFiO2 {pafi_final}.
+  Examen: {ex_resp}"""
+    else:
+        pafi_str = f" | PaFiO2 {pafi_final}" if pafi_final else ""
+        texto_resp = f"""Dispositivo: {via_aerea} | FiO2 {fio2}%{pafi_str}.
+  Examen: {ex_resp}"""
 
     balance_txt = ""
     if ingresos and egresos:
@@ -504,9 +534,7 @@ Vasoactivos: {vaso_clean}
   Perfusión: Relleno Capilar {relleno_cap}. {tdg}.
 - ECG (AHA/ACC/HRS): Ritmo {ecg_ritmo}, Eje {ecg_eje}, PR {ecg_pr}ms, QRS {ecg_qrs_ms}ms, QTc {ecg_qtc}ms. ST: {ecg_st}, Onda T: {ecg_onda_t}. {ecg_otros}
 - CV: {ex_cv}
-- RESP: {via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
-  Mecánica: P.Pico {ppico} cmH2O | Comp {comp} ml/cmH2O | DP {dp_final} cmH2O | PaFiO2 {pafi_final}.
-  Examen: {ex_resp}
+- RESP: {texto_resp}
 - ABD Y NUTRICIÓN: {ex_abd}{nutri_txt}
 - RENAL Y BALANCE: {ex_renal}{balance_txt}
 - INFECTO: Tmax {tmax}°C | ATB: {atb1} / {atb2}
