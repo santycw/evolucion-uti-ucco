@@ -11,15 +11,20 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: Autocompletado de Unidades en Infusiones")
+st.caption("Motor MBE: UI Optimizada, Autocompletado de Unidades")
 
-# --- DATOS GENERALES ---
+# --- DATOS GENERALES Y DIAGNÓSTICO (PANEL LATERAL) ---
 with st.sidebar:
     st.header("📌 Datos de Base")
-    dias_int = st.text_input("Días Internación")
+    dias_int_hosp = st.text_input("Días Int. (Hospital)")
+    dias_int_uti = st.text_input("Días Int. (UTI/UCCO)")
     dias_arm = st.text_input("Días ARM")
+
     st.divider()
-    st.info("💡 Escribe diagnósticos clave (Sepsis, IAM, IC, FA, Renal, Cirrosis, EPOC, ACV, HSA, CID, Pancreatitis) para activar escalas.")
+
+    st.header("📋 Diagnóstico Principal")
+    diagnostico = st.text_area("Diagnósticos (Activan scores automáticos):", "1. \n2. ", height=150)
+    st.caption("💡 Ej. palabras clave: Sepsis, IAM, IC, FA, Renal, Cirrosis, EPOC, ACV, HSA, CID, Pancreatitis.")
 
 # --- INICIALIZACIÓN DE SCORES ---
 sofa = qsofa = apache = ""
@@ -33,9 +38,6 @@ wells_tep = pesi = wells_tvp = ""
 blatchford = rockall = isth = ""
 
 # --- INTELIGENCIA SEMÁNTICA ---
-st.subheader("📋 Diagnóstico Principal")
-diagnostico = st.text_area("Diagnósticos (Palabras clave activan scores automáticos):", "1. \n2. ")
-
 diag_norm = diagnostico.lower()
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
 diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
@@ -75,9 +77,9 @@ is_tvp = any(kw in diag_norm for kw in kw_tvp)
 is_hda = any(kw in diag_norm for kw in kw_hda)
 is_cid = any(kw in diag_norm for kw in kw_cid)
 
-# --- MÓDULOS DE GUÍAS INTERNACIONALES ---
+# --- MÓDULOS DE GUÍAS INTERNACIONALES (Aparecen si se activan desde el sidebar) ---
 if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
-    st.markdown("### ⚙️ Scores Médicos Activados")
+    st.markdown("### ⚙️ Scores Médicos Activados (Basado en Diagnóstico)")
 
 if is_isquemia:
     with st.expander("🫀 SCASEST / IAM (AHA/ESC)", expanded=True):
@@ -386,7 +388,6 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
         "Labetalol/Esmolol": "mg/min"
     }
 
-    # 🌟 FUNCIÓN DE AUTO-LIMPIEZA Y AUTO-UNIDADES
     def procesar_drogas(texto_area):
         lista_limpia = []
         for line in texto_area.split('\n'):
@@ -395,11 +396,9 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
                 droga = droga.strip()
                 dosis = dosis.strip()
                 if dosis:
-                    # Si no hay letras en lo que escribió el usuario (sólo puso números), inyectamos la unidad.
                     if not re.search(r'[a-zA-Z]', dosis):
                         unidad = dict_unidades.get(droga, "")
                         lista_limpia.append(f"{droga}: {dosis} {unidad}".strip())
-                    # Si ya escribió alguna letra (ej: "15 ml/h"), respetamos su texto sin duplicar.
                     else:
                         lista_limpia.append(f"{droga}: {dosis}")
         return " | ".join(lista_limpia) if lista_limpia else "Sin infusiones."
@@ -460,7 +459,7 @@ if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
     fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
-Días Int: {dias_int} | Días ARM: {dias_arm}
+Días Hosp: {dias_int_hosp} | Días UTI/UCCO: {dias_int_uti} | Días ARM: {dias_arm}
 
 DIAGNÓSTICO:{txt_modulos}
 {diagnostico}
