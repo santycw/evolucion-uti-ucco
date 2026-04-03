@@ -11,7 +11,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Motor MBE: UI Optimizada, Autocompletado de Unidades")
+st.caption("Motor MBE: Tesauro Clínico Estricto (MeSH/DeCS/SEDOM) y Regex")
 
 # --- DATOS GENERALES Y DIAGNÓSTICO (PANEL LATERAL) ---
 with st.sidebar:
@@ -24,7 +24,7 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico Principal")
     diagnostico = st.text_area("Diagnósticos (Activan scores automáticos):", "1. \n2. ", height=150)
-    st.caption("💡 Ej. palabras clave: Sepsis, IAM, IC, FA, Renal, Cirrosis, EPOC, ACV, HSA, CID, Pancreatitis.")
+    st.caption("💡 Soporta siglas oficiales: SCA, SCACEST, IAM, IC, EAP, FA, AKI, IRA, ACV, TIA, HSA, NAC, EPOC, AEEPOC, TEP, HDA, CID, etc.")
 
 # --- INICIALIZACIÓN DE SCORES ---
 sofa = qsofa = apache = ""
@@ -37,47 +37,55 @@ curb65 = psi = gold = ""
 wells_tep = pesi = wells_tvp = ""
 blatchford = rockall = isth = ""
 
-# --- INTELIGENCIA SEMÁNTICA ---
+# --- INTELIGENCIA SEMÁNTICA Y TESAURO CLÍNICO ---
 diag_norm = diagnostico.lower()
+# Normalización de acentos para no fallar si el médico escribe rápido
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
 diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
 diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
 diag_norm = re.sub(r'[óöôò]', 'o', diag_norm)
 diag_norm = re.sub(r'[úüûù]', 'u', diag_norm)
 
-kw_isquemia = ["scasest", "iam", "iamcest", "infarto", "angina", "angor", "coronario"]
-kw_ic = ["ic", "insuficiencia cardiaca", "falla cardiaca"]
-kw_fa = ["fa", "fibrilacion auricular", "aleteo", "flutter"]
-kw_sepsis = ["sepsis", "septic", "shock"]
-kw_renal = ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"]
-kw_hepato = ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis"]
-kw_pancreas = ["pancreatitis"]
-kw_acv = ["acv", "ictus", "stroke", "isquemico", "hemorragico"]
-kw_hsa = ["hsa", "hemorragia subaracnoidea", "aneurisma"]
-kw_nac = ["nac", "neumonia", "pulmonia"]
-kw_epoc = ["epoc", "bronquitis cronica", "enfisema"]
-kw_tep = ["tep", "tromboembolismo pulmonar"]
-kw_tvp = ["tvp", "trombosis venosa"]
-kw_hda = ["hda", "hemorragia digestiva", "melena", "hematemesis"]
-kw_cid = ["cid", "coagulacion intravascular diseminada"]
+# DICCIONARIOS DE TERMINOLOGÍA (DeCS, MeSH, SEDOM, UpToDate, RANME)
+kw_isquemia = ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario", "isquemia", "sme coronario", "sindrome coronario"]
+kw_ic = ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "edema agudo de pulmon", "cor pulmonale", "disfuncion ventricular"]
+kw_fa = ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "taquiarritmia", "arritmia completa"]
+kw_sepsis = ["sepsis", "septic", "shock", "sirs", "bacteriemia", "infeccion severa", "foco infeccioso", "infeccion del torrente sanguineo"]
+kw_renal = ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia", "fracaso renal", "uremia", "lesion renal"]
+kw_hepato = ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "insuficiencia hepatica", "encefalopatia", "ascitis"]
+kw_pancreas = ["pancreatitis", "pa", "necrosis pancreatica"]
+kw_acv = ["acv", "ictus", "stroke", "isquemico", "hemorragico", "ataque cerebrovascular", "accidente cerebrovascular", "ait", "tia"]
+kw_hsa = ["hsa", "hemorragia subaracnoidea", "aneurisma", "hemorragia cerebral", "hematoma intraparenquimatoso", "hip"]
+kw_nac = ["nac", "neumonia", "pulmonia", "infeccion respiratoria", "bronconeumonia", "nn", "nih"]
+kw_epoc = ["epoc", "bronquitis cronica", "enfisema", "aeepoc", "exacerbacion epoc"]
+kw_tep = ["tep", "tromboembolismo", "embolia pulmonar", "tepa"]
+kw_tvp = ["tvp", "trombosis venosa", "trombosis profunda", "etv"]
+kw_hda = ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis", "enterorragia", "hematoquecia", "sangrado digestivo"]
+kw_cid = ["cid", "coagulacion intravascular diseminada", "coagulopatia"]
 
-is_isquemia = any(kw in diag_norm for kw in kw_isquemia)
-is_ic = any(kw in diag_norm for kw in kw_ic)
-is_fa = any(kw in diag_norm for kw in kw_fa)
-is_sepsis = any(kw in diag_norm for kw in kw_sepsis)
-is_renal = any(kw in diag_norm for kw in kw_renal)
-is_hepato = any(kw in diag_norm for kw in kw_hepato)
-is_pancreas = any(kw in diag_norm for kw in kw_pancreas)
-is_acv = any(kw in diag_norm for kw in kw_acv)
-is_hsa = any(kw in diag_norm for kw in kw_hsa)
-is_nac = any(kw in diag_norm for kw in kw_nac)
-is_epoc = any(kw in diag_norm for kw in kw_epoc)
-is_tep = any(kw in diag_norm for kw in kw_tep)
-is_tvp = any(kw in diag_norm for kw in kw_tvp)
-is_hda = any(kw in diag_norm for kw in kw_hda)
-is_cid = any(kw in diag_norm for kw in kw_cid)
+# MOTOR DE BÚSQUEDA ESTRICTO (Regex con límites de palabra \b)
+def detectar_diagnostico(keywords, texto):
+    # Esto asegura que busque palabras exactas. "sca" activará el score, pero "pescado" o "buscar" NO.
+    patron = r'\b(?:' + '|'.join(re.escape(kw) for kw in keywords) + r')\b'
+    return bool(re.search(patron, texto))
 
-# --- MÓDULOS DE GUÍAS INTERNACIONALES (Aparecen si se activan desde el sidebar) ---
+is_isquemia = detectar_diagnostico(kw_isquemia, diag_norm)
+is_ic = detectar_diagnostico(kw_ic, diag_norm)
+is_fa = detectar_diagnostico(kw_fa, diag_norm)
+is_sepsis = detectar_diagnostico(kw_sepsis, diag_norm)
+is_renal = detectar_diagnostico(kw_renal, diag_norm)
+is_hepato = detectar_diagnostico(kw_hepato, diag_norm)
+is_pancreas = detectar_diagnostico(kw_pancreas, diag_norm)
+is_acv = detectar_diagnostico(kw_acv, diag_norm)
+is_hsa = detectar_diagnostico(kw_hsa, diag_norm)
+is_nac = detectar_diagnostico(kw_nac, diag_norm)
+is_epoc = detectar_diagnostico(kw_epoc, diag_norm)
+is_tep = detectar_diagnostico(kw_tep, diag_norm)
+is_tvp = detectar_diagnostico(kw_tvp, diag_norm)
+is_hda = detectar_diagnostico(kw_hda, diag_norm)
+is_cid = detectar_diagnostico(kw_cid, diag_norm)
+
+# --- MÓDULOS DE GUÍAS INTERNACIONALES ---
 if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
     st.markdown("### ⚙️ Scores Médicos Activados (Basado en Diagnóstico)")
 
@@ -367,7 +375,6 @@ with tab_planes:
 
 if st.button("🚀 GENERAR EVOLUCIÓN PARA GECLISA"):
 
-    # 🌟 DICCIONARIO INTELIGENTE DE UNIDADES
     dict_unidades = {
         "Fentanilo": "gammas/h",
         "Remifentanilo": "gammas/kg/min",
