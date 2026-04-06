@@ -6,7 +6,7 @@ import os
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PERSONALIZADO (Look Profesional SaaS Médico) ---
+# --- CSS PERSONALIZADO (Formal y Profesional) ---
 st.markdown("""
     <style>
     .main { background-color: #f4f6f9; }
@@ -17,7 +17,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.2 | Módulo de Estudios Incorporado y Secciones Clínicas Separadas")
+st.caption("v2.3 | Módulo de Laboratorio Corregido y Completo")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -178,10 +178,10 @@ if is_cid:
 
 st.divider()
 
-# --- CUERPO PRINCIPAL (4 PESTAÑAS AHORA) ---
+# --- CUERPO PRINCIPAL ---
 tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
     "🩺 Clínica y Examen",
-    "🧪 Laboratorio",
+    "🧪 Laboratorio Integral",
     "🩻 ECG y Estudios",
     "📋 Plan y FAST-HUG"
 ])
@@ -279,16 +279,16 @@ with tab_clinca:
         cult_hemo = st.text_input("Cultivos y Muestras")
 
 with tab_lab:
-    st.info("💡 Solo se imprimirán los valores que completes.")
+    st.info("💡 Solo se imprimirán los valores que completes. Los campos vacíos se omitirán dinámicamente.")
     with st.container(border=True):
-        st.subheader("🌬️ EAB")
+        st.subheader("🌬️ EAB (Estado Ácido-Base)")
         e1, e2, e3, e4, e5, e6 = st.columns(6)
         ph = e1.text_input("pH")
-        pco2 = e2.text_input("pCO2")
-        po2 = e3.text_input("pO2")
-        hco3 = e4.text_input("HCO3")
-        eb = e5.text_input("EB")
-        lactato = e6.text_input("Lac")
+        pco2 = e2.text_input("pCO2 (mmHg)")
+        po2 = e3.text_input("pO2 (mmHg)")
+        hco3 = e4.text_input("HCO3 (mEq/L)")
+        eb = e5.text_input("EB (mEq/L)")
+        lactato = e6.text_input("Lac (mmol/L)")
 
     with st.container(border=True):
         st.subheader("🩸 Hemograma y Coagulación")
@@ -298,36 +298,55 @@ with tab_lab:
         gb = l3.text_input("GB (/mm³)")
         plaq = l4.text_input("Plaq (/mm³)")
 
+        st.caption("Fórmula Leucocitaria")
         f1, f2, f3, f4 = st.columns(4)
         neut = f1.text_input("Neut %")
         linf = f2.text_input("Linf %")
         mono = f3.text_input("Mono %")
         eos = f4.text_input("Eos %")
 
+        st.caption("Coagulación")
         c1, c2, c3 = st.columns(3)
         app = c1.text_input("APP (%)")
         kptt = c2.text_input("KPTT (s)")
         rin = c3.text_input("RIN")
 
     with st.container(border=True):
-        st.subheader("🧪 Química y Biomarcadores")
+        st.subheader("🧪 Química Plasmática y Electrólitos")
         q1, q2, q3, q4, q5, q6 = st.columns(6)
-        urea = q1.text_input("Urea")
-        cr = q2.text_input("Cr")
-        na = q3.text_input("Na")
-        k = q4.text_input("K")
-        cl = q5.text_input("Cl")
-        mg = q6.text_input("Mg")
+        urea = q1.text_input("Urea (mg/dL)")
+        cr = q2.text_input("Cr (mg/dL)")
+        na = q3.text_input("Na (mEq/L)")
+        k = q4.text_input("K (mEq/L)")
+        cl = q5.text_input("Cl (mEq/L)")
+        mg = q6.text_input("Mg (mg/dL)")
+        q7, q8 = st.columns(2)
+        ca = q7.text_input("Ca (mg/dL)")
+        phos = q8.text_input("P (mg/dL)")
+        gluc = st.text_input("Glucemia (mg/dL)")
 
-        he1, he2, he3, he4 = st.columns(4)
-        bt = he1.text_input("BT")
-        got = he2.text_input("GOT")
-        gpt = he3.text_input("GPT")
-        tropo = he4.text_input("Tropo I / PCT")
+    with st.container(border=True):
+        st.subheader("🟡 Hepatograma y Biomarcadores")
+        he1, he2, he3, he4, he5, he6 = st.columns(6)
+        bt = he1.text_input("BT (mg/dL)")
+        bd = he2.text_input("BD (mg/dL)")
+        got = he3.text_input("GOT (UI/L)")
+        gpt = he4.text_input("GPT (UI/L)")
+        fal = he5.text_input("FAL (UI/L)")
+        ggt = he6.text_input("GGT (UI/L)")
 
-# --- NUEVA PESTAÑA DE ESTUDIOS ---
+        st.caption("Biomarcadores y Otros")
+        b1, b2, b3, b4, b5, b6 = st.columns(6)
+        cpk = b1.text_input("CPK (UI/L)")
+        cpkmb = b2.text_input("CK-MB (UI/L)")
+        tropo = b3.text_input("Tropo I (ng/mL)")
+        bnp = b4.text_input("proBNP (pg/mL)")
+        ldh = b5.text_input("LDH (UI/L)")
+        pct = b6.text_input("PCT (ng/mL)")
+
+# --- PESTAÑA DE ESTUDIOS COMPLEMENTARIOS ---
 with tab_estudios:
-    st.info("💡 Completar únicamente los estudios disponibles. Los campos vacíos se omitirán en el texto final.")
+    st.info("💡 Solo se imprimirán los estudios que completes.")
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
         e_col1, e_col2, e_col3, e_col4 = st.columns(4)
@@ -392,7 +411,7 @@ with tab_planes:
         sedo_clean = procesar_drogas(sedo)
         vaso_clean = procesar_drogas(vaso)
 
-        # --- RUTINA DE LIMPIEZA DE LABORATORIO ---
+        # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL ---
         def construir_linea_lab(titulo, items):
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
             return f"- {titulo}: " + " | ".join(validos) if validos else ""
@@ -405,10 +424,11 @@ with tab_planes:
 
         l_hemo = construir_linea_lab("HEMOGRAMA", [("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
         l_coag = construir_linea_lab("COAGULOGRAMA", [("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab("QUÍMICA", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL")])
-        l_hepa = construir_linea_lab("HEPATO/BIOMARC", [("BT", bt, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("Tropo/PCT", tropo, "")])
+        l_quim = construir_linea_lab("QUÍMICA/ELTOS", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
+        l_hepa = construir_linea_lab("HEPATOGRAMA", [("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L")])
+        l_biom = construir_linea_lab("BIOMARCADORES", [("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", LDH, "UI/L"), ("PCT", pct, "ng/mL")])
 
-        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa] if l]
+        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_biom] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
 
         # --- RUTINA LIMPIEZA ECG Y ESTUDIOS ---
