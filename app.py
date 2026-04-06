@@ -17,7 +17,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.0 | Motor MBE, Filtrado Dinámico y UI Optimizada")
+st.caption("v2.1 | Flujo de Trabajo Integrado (Botón en Planificación)")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -334,96 +334,98 @@ with tab_planes:
         analisis = st.text_area("Análisis General")
         plan = st.text_area("Plan 24hs", "- Cultivar: \n- Interconsultas:")
 
-if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
+    # --- EL BOTÓN AHORA ESTÁ ÚNICAMENTE DENTRO DE LA PESTAÑA PLANES ---
+    st.divider()
+    if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
 
-    dict_unidades = {
-        "Fentanilo": "gammas/h", "Remifentanilo": "gammas/kg/min", "Morfina": "mg/h",
-        "Propofol": "mg/kg/h", "Midazolam": "mg/h", "Dexmedetomidina": "gammas/kg/h",
-        "Noradrenalina": "gammas/kg/min", "Vasopresina": "UI/min", "Adrenalina": "gammas/kg/min"
-    }
+        dict_unidades = {
+            "Fentanilo": "gammas/h", "Remifentanilo": "gammas/kg/min", "Morfina": "mg/h",
+            "Propofol": "mg/kg/h", "Midazolam": "mg/h", "Dexmedetomidina": "gammas/kg/h",
+            "Noradrenalina": "gammas/kg/min", "Vasopresina": "UI/min", "Adrenalina": "gammas/kg/min"
+        }
 
-    def procesar_drogas(texto_area):
-        lista = []
-        for line in texto_area.split('\n'):
-            if ':' in line:
-                d, dosis = line.split(':', 1)
-                d, dosis = d.strip(), dosis.strip()
-                if dosis:
-                    uni = dict_unidades.get(d, "") if not re.search(r'[a-zA-Z]', dosis) else ""
-                    lista.append(f"{d}: {dosis} {uni}".strip())
-        return " | ".join(lista) if lista else "Sin infusiones."
+        def procesar_drogas(texto_area):
+            lista = []
+            for line in texto_area.split('\n'):
+                if ':' in line:
+                    d, dosis = line.split(':', 1)
+                    d, dosis = d.strip(), dosis.strip()
+                    if dosis:
+                        uni = dict_unidades.get(d, "") if not re.search(r'[a-zA-Z]', dosis) else ""
+                        lista.append(f"{d}: {dosis} {uni}".strip())
+            return " | ".join(lista) if lista else "Sin infusiones."
 
-    sedo_clean = procesar_drogas(sedo)
-    vaso_clean = procesar_drogas(vaso)
+        sedo_clean = procesar_drogas(sedo)
+        vaso_clean = procesar_drogas(vaso)
 
-    # --- RUTINA DE LIMPIEZA DE LABORATORIO ---
-    def construir_linea_lab(titulo, items):
-        validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
-        return f"- {titulo}: " + " | ".join(validos) if validos else ""
+        # --- RUTINA DE LIMPIEZA DE LABORATORIO ---
+        def construir_linea_lab(titulo, items):
+            validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
+            return f"- {titulo}: " + " | ".join(validos) if validos else ""
 
-    l_eab = construir_linea_lab("EAB", [("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
+        l_eab = construir_linea_lab("EAB", [("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
 
-    gb_str = f"{gb} /mm³" if gb.strip() else ""
-    if gb_str and any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
-        gb_str += f" (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
+        gb_str = f"{gb} /mm³" if gb.strip() else ""
+        if gb_str and any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
+            gb_str += f" (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
 
-    l_hemo = construir_linea_lab("HEMOGRAMA", [("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
-    l_coag = construir_linea_lab("COAGULOGRAMA", [("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-    l_quim = construir_linea_lab("QUÍMICA", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL")])
-    l_hepa = construir_linea_lab("HEPATO/BIOMARC", [("BT", bt, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("Tropo/PCT", tropo, "")])
+        l_hemo = construir_linea_lab("HEMOGRAMA", [("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
+        l_coag = construir_linea_lab("COAGULOGRAMA", [("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
+        l_quim = construir_linea_lab("QUÍMICA", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL")])
+        l_hepa = construir_linea_lab("HEPATO/BIOMARC", [("BT", bt, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("Tropo/PCT", tropo, "")])
 
-    lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa] if l]
-    texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
+        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa] if l]
+        texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
 
-    # Bloque Scores
-    txt_mod = ""
-    if is_isquemia and any([killip, grace, timi]): txt_mod += f"\n[+] SCA/IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
-    if is_ic and any([nyha, stevenson, aha_ic]): txt_mod += f"\n[+] IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
-    if is_sepsis and any([qsofa, sofa, apache]): txt_mod += f"\n[+] SEPSIS -> qSOFA: {qsofa} | SOFA: {sofa} | APACHE: {apache}"
-    if is_renal and any([kdigo_ira, kdigo_erc]): txt_mod += f"\n[+] NEFRO -> IRA: {kdigo_ira} | ERC: {kdigo_erc}"
-    if is_hepato and any([child, meld]): txt_mod += f"\n[+] HEPATO -> Child: {child} | MELD: {meld}"
-    if is_nac and any([curb65, psi]): txt_mod += f"\n[+] NAC -> CURB-65: {curb65} | PSI: {psi}"
+        # Bloque Scores
+        txt_mod = ""
+        if is_isquemia and any([killip, grace, timi]): txt_mod += f"\n[+] SCA/IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
+        if is_ic and any([nyha, stevenson, aha_ic]): txt_mod += f"\n[+] IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
+        if is_sepsis and any([qsofa, sofa, apache]): txt_mod += f"\n[+] SEPSIS -> qSOFA: {qsofa} | SOFA: {sofa} | APACHE: {apache}"
+        if is_renal and any([kdigo_ira, kdigo_erc]): txt_mod += f"\n[+] NEFRO -> IRA: {kdigo_ira} | ERC: {kdigo_erc}"
+        if is_hepato and any([child, meld]): txt_mod += f"\n[+] HEPATO -> Child: {child} | MELD: {meld}"
+        if is_nac and any([curb65, psi]): txt_mod += f"\n[+] NAC -> CURB-65: {curb65} | PSI: {psi}"
 
-    tam_txt = ""
-    if "/" in ta:
-        try:
-            s, d = map(float, ta.split("/"))
-            tam_txt = f"(TAM {round((s+2*d)/3)} | PP {int(s-d)})"
-        except: pass
-
-    pafi_final = pafi_manual
-    if not pafi_final and po2 and fio2:
-        try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
-        except: pass
-
-    if paciente_ventilado:
-        dp_final = dp_manual
-        if not dp_final and pplat and peep:
-            try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
+        tam_txt = ""
+        if "/" in ta:
+            try:
+                s, d = map(float, ta.split("/"))
+                tam_txt = f"(TAM {round((s+2*d)/3)} | PP {int(s-d)})"
             except: pass
 
-        texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
+        pafi_final = pafi_manual
+        if not pafi_final and po2 and fio2:
+            try: pafi_final = str(int(float(str(po2).replace(',','.')) / (float(fio2)/100)))
+            except: pass
+
+        if paciente_ventilado:
+            dp_final = dp_manual
+            if not dp_final and pplat and peep:
+                try: dp_final = str(int(float(str(pplat).replace(',','.')) - float(str(peep).replace(',','.'))))
+                except: pass
+
+            texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
   Mecánica: P.Pico {ppico} cmH2O | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}"""
-    else:
-        pafi_str = f" | PaFiO2 {pafi_final}" if pafi_final else ""
-        texto_resp = f"""Dispositivo: {via_aerea} | FiO2 {fio2}%{pafi_str}.
+        else:
+            pafi_str = f" | PaFiO2 {pafi_final}" if pafi_final else ""
+            texto_resp = f"""Dispositivo: {via_aerea} | FiO2 {fio2}%{pafi_str}.
   Examen: {ex_resp}"""
 
-    balance_txt = ""
-    if ingresos and egresos:
-        try:
-            bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
-            balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance 24h: {bal:+.0f} ml)"
-        except: pass
+        balance_txt = ""
+        if ingresos and egresos:
+            try:
+                bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
+                balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance 24h: {bal:+.0f} ml)"
+            except: pass
 
-    nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
-    fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
+        nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
+        fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
-    atb_txt = ""
-    if atb1 or atb2: atb_txt = f"\n  ATB: {atb1} / {atb2}"
+        atb_txt = ""
+        if atb1 or atb2: atb_txt = f"\n  ATB: {atb1} / {atb2}"
 
-    texto_final = f"""EVOLUCIÓN UTI / UCCO
+        texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
 DIAGNÓSTICO:{txt_mod}
@@ -457,5 +459,5 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 PLAN:
 {plan}
 """
-    st.success("✅ Evolución generada con éxito. Lista para exportar a GECLISA.")
-    st.code(texto_final, language="markdown")
+        st.success("✅ Evolución generada con éxito. Lista para exportar a GECLISA.")
+        st.code(texto_final, language="markdown")
