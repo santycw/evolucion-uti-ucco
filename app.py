@@ -17,7 +17,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.1 | Flujo de Trabajo Integrado (Botón en Planificación)")
+st.caption("v2.2 | Módulo de Estudios Incorporado y Secciones Clínicas Separadas")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -178,8 +178,13 @@ if is_cid:
 
 st.divider()
 
-# --- CUERPO PRINCIPAL ---
-tab_clinca, tab_lab, tab_planes = st.tabs(["🩺 Clínica y Examen", "🧪 Laboratorios Dinámicos", "📋 Plan y FAST-HUG"])
+# --- CUERPO PRINCIPAL (4 PESTAÑAS AHORA) ---
+tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
+    "🩺 Clínica y Examen",
+    "🧪 Laboratorio",
+    "🩻 ECG y Estudios",
+    "📋 Plan y FAST-HUG"
+])
 
 with tab_clinca:
     with st.container(border=True):
@@ -253,23 +258,28 @@ with tab_clinca:
         ex_resp = st.text_input("Examen Respiratorio", "Buena entrada de aire bilateral.")
 
     with st.container(border=True):
-        st.subheader("3. Digestivo, Renal e Infectología")
-        a1, a2, a3 = st.columns(3)
+        st.subheader("3. Digestivo y Nutrición")
+        a1, a2 = st.columns(2)
         ex_abd = a1.text_input("Abdomen", "Blando, depresible.")
         nutricion = a2.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral"])
-        ex_renal = a3.text_input("Diuresis", "Conservada.")
 
+    with st.container(border=True):
+        st.subheader("4. Renal y Balance Hídrico")
+        ex_renal = st.text_input("Diuresis / Ex. Renal", "Conservada.")
         bh1, bh2 = st.columns(2)
         ingresos = bh1.text_input("Ingresos Totales (ml)")
         egresos = bh2.text_input("Egresos Totales (ml)")
 
+    with st.container(border=True):
+        st.subheader("5. Infectología")
+        tmax = st.text_input("Temp. Máxima 24h (°C)")
         i_1, i_2 = st.columns(2)
         atb1 = i_1.text_input("ATB 1 y Día")
         atb2 = i_2.text_input("ATB 2 y Día")
-        cult_hemo = st.text_input("Hemocultivos / Otros")
+        cult_hemo = st.text_input("Cultivos y Muestras")
 
 with tab_lab:
-    st.info("💡 Completar únicamente los valores disponibles. Los campos en blanco no se imprimirán en el texto final.")
+    st.info("💡 Solo se imprimirán los valores que completes.")
     with st.container(border=True):
         st.subheader("🌬️ EAB")
         e1, e2, e3, e4, e5, e6 = st.columns(6)
@@ -315,6 +325,31 @@ with tab_lab:
         gpt = he3.text_input("GPT")
         tropo = he4.text_input("Tropo I / PCT")
 
+# --- NUEVA PESTAÑA DE ESTUDIOS ---
+with tab_estudios:
+    st.info("💡 Completar únicamente los estudios disponibles. Los campos vacíos se omitirán en el texto final.")
+    with st.container(border=True):
+        st.subheader("📊 Electrocardiograma (ECG)")
+        e_col1, e_col2, e_col3, e_col4 = st.columns(4)
+        ecg_ritmo = e_col1.text_input("Ritmo")
+        ecg_eje = e_col2.text_input("Eje (°)")
+        ecg_pr = e_col3.text_input("PR (ms)")
+        ecg_qrs_ms = e_col4.text_input("QRS (ms)")
+
+        e_col5, e_col6, e_col7 = st.columns(3)
+        ecg_qtc = e_col5.text_input("QTc (ms)")
+        ecg_st = e_col6.text_input("Segmento ST")
+        ecg_onda_t = e_col7.text_input("Onda T")
+
+        ecg_otros = st.text_input("Otros hallazgos (Bloqueos, Ondas Q, etc.)")
+
+    with st.container(border=True):
+        st.subheader("🩻 Imágenes y Procedimientos")
+        rx_torax = st.text_area("Rx Tórax / Radiografías", height=68)
+        tc = st.text_area("Tomografía (TC)", height=68)
+        eco = st.text_area("Ecografía / POCUS", height=68)
+        otros_estudios = st.text_area("Otros (Endoscopía, EEG, Interconsultas específicas)", height=68)
+
 with tab_planes:
     with st.container(border=True):
         st.subheader("🛡️ FAST HUG BID")
@@ -334,7 +369,6 @@ with tab_planes:
         analisis = st.text_area("Análisis General")
         plan = st.text_area("Plan 24hs", "- Cultivar: \n- Interconsultas:")
 
-    # --- EL BOTÓN AHORA ESTÁ ÚNICAMENTE DENTRO DE LA PESTAÑA PLANES ---
     st.divider()
     if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
 
@@ -376,6 +410,27 @@ with tab_planes:
 
         lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
+
+        # --- RUTINA LIMPIEZA ECG Y ESTUDIOS ---
+        ecg_items = [("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
+                     ("QRS", ecg_qrs_ms, "ms"), ("QTc", ecg_qtc, "ms"), ("ST", ecg_st, ""), ("Onda T", ecg_onda_t, "")]
+        ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
+        if ecg_otros.strip(): ecg_validos.append(ecg_otros.strip())
+
+        ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
+
+        est_list = []
+        if rx_torax.strip(): est_list.append(f"- Rx: {rx_torax.strip()}")
+        if tc.strip(): est_list.append(f"- TC: {tc.strip()}")
+        if eco.strip(): est_list.append(f"- Eco/POCUS: {eco.strip()}")
+        if otros_estudios.strip(): est_list.append(f"- Otros Estudios: {otros_estudios.strip()}")
+
+        texto_adicionales = "\n".join(est_list)
+
+        bloque_estudios = ""
+        if ecg_final or texto_adicionales:
+            partes_estudios = [p for p in [ecg_final, texto_adicionales] if p]
+            bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join(partes_estudios) + "\n"
 
         # Bloque Scores
         txt_mod = ""
@@ -422,8 +477,12 @@ with tab_planes:
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
-        atb_txt = ""
-        if atb1 or atb2: atb_txt = f"\n  ATB: {atb1} / {atb2}"
+        # Secciones Clínicas Separadas
+        tmax_str = f"Tmax {tmax}°C" if tmax.strip() else ""
+        atb_str = f"ATB: {atb1} / {atb2}".strip(' /') if (atb1 or atb2) else ""
+        cult_str = f"Cultivos: {cult_hemo}" if cult_hemo.strip() else ""
+        infecto_parts = [p for p in [tmax_str, atb_str, cult_str] if p]
+        infecto_line = "- INFECTO: " + " | ".join(infecto_parts) if infecto_parts else "- INFECTO: Sin intercurrencias."
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
@@ -446,11 +505,11 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 - RESP: {texto_resp}
 - ABD: {ex_abd}{nutri_txt}
 - RENAL: {ex_renal}{balance_txt}
-- INFECTO: {cult_hemo}{atb_txt}
+{infecto_line}
 
 >> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
-
+{bloque_estudios}
 >> FAST HUG BID:
 {fast_texto}
 
