@@ -2,6 +2,7 @@ import streamlit as st
 import re
 import json
 import os
+import datetime
 
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
@@ -17,20 +18,25 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.3 | Módulo de Laboratorio Corregido y Completo")
+st.caption("v2.5 | Formato de Laboratorio Optimizado (Supresión de Títulos)")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
     st.header("📌 Contexto del Paciente")
     with st.container(border=True):
-        dias_int_hosp = st.text_input("Días Int. (Hospital)", placeholder="Ej: 12")
-        dias_int_uti = st.text_input("Días Int. (UTI/UCCO)", placeholder="Ej: 4")
+        fecha_hosp = st.date_input("Fecha de Ingreso Institución", format="DD/MM/YYYY")
+        fecha_uti = st.date_input("Fecha de ingreso UTI/UCCO", format="DD/MM/YYYY")
         dias_arm = st.text_input("Días ARM", placeholder="Ej: 0 o dejar vacío si no usa")
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
         diagnostico = st.text_area("Diagnósticos (Activan scores):", "1. \n2. ", height=120)
         st.caption("Soporta siglas oficiales: SCA, EAP, AKI, NAC, EPOC, etc.")
+
+# --- CÁLCULO DINÁMICO DE DÍAS ---
+hoy = datetime.date.today()
+dias_int_hosp = (hoy - fecha_hosp).days
+dias_int_uti = (hoy - fecha_uti).days
 
 # --- VARIABLE CONDICIONAL: PACIENTE VENTILADO ---
 d_arm_limpio = dias_arm.strip().lower()
@@ -228,7 +234,11 @@ with tab_clinca:
         sat = h4.text_input("SatO2 (%)")
         temp = h5.text_input("Temp (°C)")
 
-        ex_cv = st.text_area("Ex. Cardiovascular", "Relleno capilar <2s. Sin livideces. R1/R2 normofonéticos.")
+        v1, v2 = st.columns(2)
+        pvc = v1.text_input("PVC (cmH2O)")
+        relleno_cap = v2.text_input("Relleno Capilar", "< 2 seg")
+
+        ex_cv = st.text_area("Ex. Cardiovascular", "Sin livideces. R1/R2 normofonéticos.")
 
     with st.container(border=True):
         st.subheader("2. Respiratorio y ARM")
@@ -276,7 +286,12 @@ with tab_clinca:
         i_1, i_2 = st.columns(2)
         atb1 = i_1.text_input("ATB 1 y Día")
         atb2 = i_2.text_input("ATB 2 y Día")
-        cult_hemo = st.text_input("Cultivos y Muestras")
+        c_1, c_2 = st.columns(2)
+        cult_hemo = c_1.text_input("Hemocultivos")
+        cult_uro = c_2.text_input("Urocultivo")
+        c_3, c_4 = st.columns(2)
+        cult_resp = c_3.text_input("Respiratorios (BAL/Mini-BAL)")
+        cult_otros = c_4.text_input("Otros (LCR, Catéter, Piel/PB)")
 
 with tab_lab:
     st.info("💡 Solo se imprimirán los valores que completes. Los campos vacíos se omitirán dinámicamente.")
@@ -326,7 +341,7 @@ with tab_lab:
         gluc = st.text_input("Glucemia (mg/dL)")
 
     with st.container(border=True):
-        st.subheader("🟡 Hepatograma y Biomarcadores")
+        st.subheader("🟡 Hepatograma, Proteínas y Biomarcadores")
         he1, he2, he3, he4, he5, he6 = st.columns(6)
         bt = he1.text_input("BT (mg/dL)")
         bd = he2.text_input("BD (mg/dL)")
@@ -334,6 +349,10 @@ with tab_lab:
         gpt = he4.text_input("GPT (UI/L)")
         fal = he5.text_input("FAL (UI/L)")
         ggt = he6.text_input("GGT (UI/L)")
+
+        p1, p2 = st.columns(2)
+        pt = p1.text_input("Proteínas Totales (g/dL)")
+        alb = p2.text_input("Albúmina (g/dL)")
 
         st.caption("Biomarcadores y Otros")
         b1, b2, b3, b4, b5, b6 = st.columns(6)
@@ -411,22 +430,26 @@ with tab_planes:
         sedo_clean = procesar_drogas(sedo)
         vaso_clean = procesar_drogas(vaso)
 
-        # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL ---
-        def construir_linea_lab(titulo, items):
+        # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL (SIN TÍTULOS) ---
+        def construir_linea_lab(items):
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
-            return f"- {titulo}: " + " | ".join(validos) if validos else ""
+            return " | ".join(validos) if validos else ""
 
-        l_eab = construir_linea_lab("EAB", [("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
+        l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
 
-        gb_str = f"{gb} /mm³" if gb.strip() else ""
-        if gb_str and any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
-            gb_str += f" (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
+        gb_str = f"{gb}".strip() if gb.strip() else ""
+        if gb_str:
+            if any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
+                gb_str += f" /mm³ (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
+            else:
+                gb_str += " /mm³"
 
-        l_hemo = construir_linea_lab("HEMOGRAMA", [("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
-        l_coag = construir_linea_lab("COAGULOGRAMA", [("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab("QUÍMICA/ELTOS", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
-        l_hepa = construir_linea_lab("HEPATOGRAMA", [("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L")])
-        l_biom = construir_linea_lab("BIOMARCADORES", [("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
+        l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
+        l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
+        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
+        l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
+        l_biom = construir_linea_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
+
         lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_biom] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
 
@@ -451,6 +474,22 @@ with tab_planes:
             partes_estudios = [p for p in [ecg_final, texto_adicionales] if p]
             bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join(partes_estudios) + "\n"
 
+        # --- RUTINA LIMPIEZA INFECTOLOGÍA ---
+        lista_cultivos = []
+        if cult_hemo.strip(): lista_cultivos.append(f"Hemo: {cult_hemo.strip()}")
+        if cult_uro.strip(): lista_cultivos.append(f"Uro: {cult_uro.strip()}")
+        if cult_resp.strip(): lista_cultivos.append(f"Resp: {cult_resp.strip()}")
+        if cult_otros.strip(): lista_cultivos.append(f"Otros: {cult_otros.strip()}")
+        cultivos_final = " | ".join(lista_cultivos)
+
+        tmax_str = f"Tmax: {tmax.strip()}°C" if tmax.strip() else ""
+        atb_str = f"ATB: {atb1} / {atb2}".strip(' /') if (atb1 or atb2) else ""
+
+        infecto_parts = [p for p in [tmax_str, atb_str, cultivos_final] if p]
+        bloque_infectologia = ""
+        if infecto_parts:
+            bloque_infectologia = "\n>> INFECTOLOGÍA:\n" + "\n".join([f"- {p}" for p in infecto_parts]) + "\n"
+
         # Bloque Scores
         txt_mod = ""
         if is_isquemia and any([killip, grace, timi]): txt_mod += f"\n[+] SCA/IAM -> Killip: {killip} | GRACE: {grace} | TIMI: {timi}"
@@ -460,12 +499,21 @@ with tab_planes:
         if is_hepato and any([child, meld]): txt_mod += f"\n[+] HEPATO -> Child: {child} | MELD: {meld}"
         if is_nac and any([curb65, psi]): txt_mod += f"\n[+] NAC -> CURB-65: {curb65} | PSI: {psi}"
 
-        tam_txt = ""
-        if "/" in ta:
-            try:
-                s, d = map(float, ta.split("/"))
-                tam_txt = f"(TAM {round((s+2*d)/3)} | PP {int(s-d)})"
-            except: pass
+        tam_str = f"{tam_val}" if tam_val != "" else "-"
+        pp_str = f"{pp_val}" if pp_val != "" else "-"
+
+        # Bloque Signos Vitales Vertical
+        signos_vitales = f"""- SIGNOS VITALES:
+  TA: {ta if ta.strip() else '-'} mmHg
+  TAM: {tam_str} mmHg
+  PP: {pp_str} mmHg
+  PR: {fc if fc.strip() else '-'} lpm
+  PVC: {pvc if pvc.strip() else '-'} cmH2O
+  Rell. Capilar: {relleno_cap if relleno_cap.strip() else '-'}
+  FR: {fr if fr.strip() else '-'} rpm
+  SatO2: {sat if sat.strip() else '-'} %
+  FiO2: {fio2 if fio2 else '-'} %
+  T°: {temp if temp.strip() else '-'} °C"""
 
         pafi_final = pafi_manual
         if not pafi_final and po2 and fio2:
@@ -496,19 +544,12 @@ with tab_planes:
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
 
-        # Secciones Clínicas Separadas
-        tmax_str = f"Tmax {tmax}°C" if tmax.strip() else ""
-        atb_str = f"ATB: {atb1} / {atb2}".strip(' /') if (atb1 or atb2) else ""
-        cult_str = f"Cultivos: {cult_hemo}" if cult_hemo.strip() else ""
-        infecto_parts = [p for p in [tmax_str, atb_str, cult_str] if p]
-        infecto_line = "- INFECTO: " + " | ".join(infecto_parts) if infecto_parts else "- INFECTO: Sin intercurrencias."
-
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
 DIAGNÓSTICO:{txt_mod}
 {diagnostico}
-
+{bloque_infectologia}
 (S) SUBJETIVO: {subj}
 
 (O) OBJETIVO:
@@ -518,13 +559,13 @@ Vasoactivos: {vaso_clean}
 Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
+{signos_vitales}
+
 - NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}.
-- HEMO: TA {ta} mmHg {tam_txt}, FC {fc} lpm, FR {fr} rpm, Sat {sat}%, Temp {temp}°C.
-  CV: {ex_cv}
+- CV: {ex_cv}
 - RESP: {texto_resp}
 - ABD: {ex_abd}{nutri_txt}
 - RENAL: {ex_renal}{balance_txt}
-{infecto_line}
 
 >> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
