@@ -18,7 +18,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.5 | Formato de Laboratorio Optimizado (Supresión de Títulos)")
+st.caption("v2.6 | Resolución de Colisión de Variables en Motor de Generación")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -332,7 +332,7 @@ with tab_lab:
         urea = q1.text_input("Urea (mg/dL)")
         cr = q2.text_input("Cr (mg/dL)")
         na = q3.text_input("Na (mEq/L)")
-        k = q4.text_input("K (mEq/L)")
+        potasio = q4.text_input("K (mEq/L)")  # Variable renombrada para evitar colisión
         cl = q5.text_input("Cl (mEq/L)")
         mg = q6.text_input("Mg (mg/dL)")
         q7, q8 = st.columns(2)
@@ -398,9 +398,10 @@ with tab_planes:
         }
         f_cols = st.columns(5)
         fast_sel = []
-        for i, (k, v) in enumerate(fast_dict.items()):
-            if f_cols[i % 5].checkbox(k, help=v):
-                fast_sel.append(f"{k} - {v}")
+        # Reemplazo de variables (k, v) a (letra, descripcion) para evitar shadowing
+        for i, (letra, descripcion) in enumerate(fast_dict.items()):
+            if f_cols[i % 5].checkbox(letra, help=descripcion):
+                fast_sel.append(f"{letra} - {descripcion}")
 
     with st.container(border=True):
         st.subheader("(A/P) Análisis y Plan")
@@ -446,7 +447,8 @@ with tab_planes:
 
         l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
         l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
+        # Actualización para utilizar la variable renombrada 'potasio'
+        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
         l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
         l_biom = construir_linea_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
 
@@ -542,7 +544,7 @@ with tab_planes:
             except: pass
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
-        fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
+        fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
