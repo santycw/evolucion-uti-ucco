@@ -18,7 +18,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.4 | Fechas automatizadas, Signos Vitales verticales y Laboratorio extendido")
+st.caption("v2.6 | Corrección Definitiva: Aislamiento de Variables y Supresión de Títulos")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -195,7 +195,7 @@ tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
 with tab_clinca:
     with st.container(border=True):
         st.subheader("(S) Subjetivo")
-        subj = st.text_area("Novedades:", "Paciente estable, sin cambios agudos.", height=68)
+        subj = st.text_area("Novedades:", "Paciente estable, sin intercurrencias agudas.", height=68)
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
@@ -294,7 +294,7 @@ with tab_clinca:
         cult_otros = c_4.text_input("Otros (LCR, Catéter, Piel/PB)")
 
 with tab_lab:
-    st.info("💡 Solo se imprimirán los valores que completes. Los campos vacíos se omitirán dinámicamente.")
+    st.info("💡 Solo se imprimirán los valores que se completen explícitamente. Ausencia de títulos garantizada en el formato final.")
     with st.container(border=True):
         st.subheader("🌬️ EAB (Estado Ácido-Base)")
         e1, e2, e3, e4, e5, e6 = st.columns(6)
@@ -332,7 +332,8 @@ with tab_lab:
         urea = q1.text_input("Urea (mg/dL)")
         cr = q2.text_input("Cr (mg/dL)")
         na = q3.text_input("Na (mEq/L)")
-        k = q4.text_input("K (mEq/L)")
+        # Aislamiento nominal de la variable Potasio para evitar Shadowing
+        potasio = q4.text_input("K (mEq/L)")
         cl = q5.text_input("Cl (mEq/L)")
         mg = q6.text_input("Mg (mg/dL)")
         q7, q8 = st.columns(2)
@@ -398,9 +399,10 @@ with tab_planes:
         }
         f_cols = st.columns(5)
         fast_sel = []
-        for i, (k, v) in enumerate(fast_dict.items()):
-            if f_cols[i % 5].checkbox(k, help=v):
-                fast_sel.append(f"{k} - {v}")
+        # Reemplazo nominal: uso de 'letra' y 'descripcion'
+        for i, (letra, descripcion) in enumerate(fast_dict.items()):
+            if f_cols[i % 5].checkbox(letra, help=descripcion):
+                fast_sel.append(f"{letra} - {descripcion}")
 
     with st.container(border=True):
         st.subheader("(A/P) Análisis y Plan")
@@ -430,22 +432,27 @@ with tab_planes:
         sedo_clean = procesar_drogas(sedo)
         vaso_clean = procesar_drogas(vaso)
 
-        # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL ---
-        def construir_linea_lab(titulo, items):
+        # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL (SIN TÍTULOS) ---
+        def construir_linea_lab(items):
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
-            return f"- {titulo}: " + " | ".join(validos) if validos else ""
+            return " | ".join(validos) if validos else ""
 
-        l_eab = construir_linea_lab("EAB", [("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
+        l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
 
-        gb_str = f"{gb} /mm³" if gb.strip() else ""
-        if gb_str and any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
-            gb_str += f" (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
+        gb_str = f"{gb}".strip() if gb.strip() else ""
+        if gb_str:
+            if any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
+                gb_str += f" /mm³ (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
+            else:
+                gb_str += " /mm³"
 
-        l_hemo = construir_linea_lab("HEMOGRAMA", [("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
-        l_coag = construir_linea_lab("COAGULOGRAMA", [("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab("QUÍMICA/ELTOS", [("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", k, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
-        l_hepa = construir_linea_lab("HEPATOGRAMA/PROT", [("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
-        l_biom = construir_linea_lab("BIOMARCADORES", [("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
+        l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
+        l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
+
+        # Inserción de variable 'potasio'
+        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
+        l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
+        l_biom = construir_linea_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
 
         lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_biom] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
@@ -539,7 +546,7 @@ with tab_planes:
             except: pass
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
-        fast_texto = "\n".join([f"  ✓ {x}" for x in fast_sel]) if fast_sel else "  Sin marcar."
+        fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
