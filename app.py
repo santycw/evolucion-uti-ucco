@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v3.2 | Integración Automatizada de Calculadora a Reporte Final")
+st.caption("v3.3 | Unificación de Sedoanalgesia y Fentanilo en mcg/kg/h")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -249,11 +249,12 @@ with tab_clinca:
         with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=False):
             st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
 
+            # Fentanilo actualizado a mcg/kg/h
             dict_calc_drogas = {
                 "Noradrenalina": "mcg/kg/min",
                 "Adrenalina": "mcg/kg/min",
                 "Dobutamina": "mcg/kg/min",
-                "Fentanilo": "mcg/h",
+                "Fentanilo": "mcg/kg/h",
                 "Remifentanilo": "mcg/kg/h",
                 "Morfina": "mg/h",
                 "Propofol": "mg/kg/h",
@@ -297,7 +298,6 @@ with tab_clinca:
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
 
                     if st.button(f"➕ Anexar {droga_sel} a la Evolución"):
-                        # Para el reporte clínico documentamos la DOSIS, no la velocidad de la bomba
                         item = f"{droga_sel}: {dosis_obj:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
@@ -306,7 +306,7 @@ with tab_clinca:
             # --- VISOR DE MEMORIA ACTIVA ---
             if st.session_state['infusiones_automatizadas']:
                 st.markdown("---")
-                st.caption("📋 **Infusiones en memoria (Listas para el reporte):**")
+                st.caption("📋 **Sedoanalgesia e Infusiones en memoria:**")
                 for inf in st.session_state['infusiones_automatizadas']:
                     st.markdown(f"- `{inf}`")
 
@@ -314,12 +314,9 @@ with tab_clinca:
                     st.session_state['infusiones_automatizadas'] = []
                     st.rerun()
 
-        # --- CAMPOS DE TEXTO ORIGINALES ---
-        i1, i2 = st.columns(2)
-        sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: "
-        sedo = i1.text_area("Sedoanalgesia (Manual)", sedo_def, height=180)
+        # --- CAMPO MANUAL REDUCIDO A VASOACTIVOS ---
         vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLabetalol: "
-        vaso = i2.text_area("Vasoactivos (Manual)", vaso_def, height=180)
+        vaso = st.text_area("Vasoactivos (Manual)", vaso_def, height=130)
 
         st.caption("Invasiones")
         d1, d2, d3, d4 = st.columns(4)
@@ -541,17 +538,8 @@ with tab_planes:
 
     if btn_generar:
 
-        # Diccionario de respaldo para los campos manuales
+        # Diccionario de respaldo para campos manuales
         dict_unidades = {
-            "Fentanilo": "mcg/h",
-            "Remifentanilo": "mcg/kg/h",
-            "Morfina": "mg/h",
-            "Propofol": "mg/kg/h",
-            "Midazolam": "mg/kg/h",
-            "Dexmedetomidina": "mcg/kg/h",
-            "Ketamina": "mg/kg/h",
-            "Atracurio": "mg/kg/h",
-            "Pancuronio": "mg/kg/h",
             "Noradrenalina": "mcg/kg/min",
             "Adrenalina": "mcg/kg/min",
             "Dobutamina": "mcg/kg/min",
@@ -570,13 +558,12 @@ with tab_planes:
                         lista.append(f"{d}: {dosis} {uni}".strip())
             return " | ".join(lista) if lista else "Sin infusiones."
 
-        sedo_clean = procesar_drogas(sedo)
         vaso_clean = procesar_drogas(vaso)
 
-        # --- ENSAMBLE DE INFUSIONES AUTOMATIZADAS ---
-        str_automatizadas = ""
+        # --- ENSAMBLE DE INFUSIONES AUTOMATIZADAS (Sedoanalgesia y otras calculadas) ---
+        str_automatizadas = "Sin infusiones en calculadora."
         if st.session_state['infusiones_automatizadas']:
-            str_automatizadas = "\nInfusiones Calculadas: " + " | ".join(st.session_state['infusiones_automatizadas'])
+            str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas'])
 
         # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL (SIN TÍTULOS) ---
         def construir_linea_lab(items):
@@ -704,8 +691,8 @@ DIAGNÓSTICO:{txt_mod}
 
 (O) OBJETIVO:
 >> INFUSIONES Y DISPOSITIVOS:
-Sedoanalgesia (Manual): {sedo_clean}
-Vasoactivos (Manual): {vaso_clean}{str_automatizadas}
+Sedoanalgesia e Infusiones: {str_automatizadas}
+Vasoactivos (Manual): {vaso_clean}
 Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
