@@ -4,10 +4,27 @@ import json
 import os
 import datetime
 
+# --- FUNCIONES DE CÁLCULO DE INFUSIONES ---
+def calcular_dosis_mcg_kg_min(peso_kg, cantidad_droga_mg, volumen_dilucion_ml, velocidad_ml_h):
+    if volumen_dilucion_ml == 0 or peso_kg == 0:
+        return 0.0
+    concentracion_mg_ml = cantidad_droga_mg / volumen_dilucion_ml
+    concentracion_mcg_ml = concentracion_mg_ml * 1000
+    dosis_mcg_min = (velocidad_ml_h * concentracion_mcg_ml) / 60
+    return dosis_mcg_min / peso_kg
+
+def calcular_velocidad_ml_h(peso_kg, cantidad_droga_mg, volumen_dilucion_ml, dosis_mcg_kg_min):
+    if volumen_dilucion_ml == 0 or cantidad_droga_mg == 0:
+        return 0.0
+    concentracion_mg_ml = cantidad_droga_mg / volumen_dilucion_ml
+    concentracion_mcg_ml = concentracion_mg_ml * 1000
+    dosis_mcg_min = dosis_mcg_kg_min * peso_kg
+    return (dosis_mcg_min * 60) / concentracion_mcg_ml
+
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PERSONALIZADO (Formal y Profesional) ---
+# --- CSS PERSONALIZADO ---
 st.markdown("""
     <style>
     .main { background-color: #f4f6f9; }
@@ -18,20 +35,20 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.6 | Corrección Definitiva: Aislamiento de Variables y Supresión de Títulos")
+st.caption("v2.7 | Módulo Integrado de Cálculo Farmacológico (mcg/kg/min)")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
     st.header("📌 Contexto del Paciente")
     with st.container(border=True):
+        peso_paciente = st.number_input("Peso Estimado (kg)", min_value=1.0, value=70.0, step=1.0)
         fecha_hosp = st.date_input("Fecha de Ingreso Institución", format="DD/MM/YYYY")
         fecha_uti = st.date_input("Fecha de ingreso UTI/UCCO", format="DD/MM/YYYY")
-        dias_arm = st.text_input("Días ARM", placeholder="Ej: 0 o dejar vacío si no usa")
+        dias_arm = st.text_input("Días ARM", placeholder="Ej: 0 o dejar vacío")
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
         diagnostico = st.text_area("Diagnósticos (Activan scores):", "1. \n2. ", height=120)
-        st.caption("Soporta siglas oficiales: SCA, EAP, AKI, NAC, EPOC, etc.")
 
 # --- CÁLCULO DINÁMICO DE DÍAS ---
 hoy = datetime.date.today()
@@ -199,6 +216,28 @@ with tab_clinca:
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
+
+        # --- CALCULADORA DE INFUSIONES INTEGRADA ---
+        with st.expander("🧮 Calculadora de Infusiones (mcg/kg/min)", expanded=False):
+            st.info("💡 Utilice esta herramienta para calcular dosis de fármacos dependientes del peso (ej. Noradrenalina, Adrenalina). El peso actual configurado es: **{} kg**.".format(peso_paciente))
+            c_calc1, c_calc2 = st.columns(2)
+            droga_mg = c_calc1.number_input("Cantidad de Droga (mg)", min_value=0.0, value=0.0, step=1.0)
+            volumen_ml = c_calc2.number_input("Volumen de Dilución (ml)", min_value=0.0, value=0.0, step=10.0)
+
+            calc_modo = st.radio("Dirección del cálculo", ["Calcular DOSIS (mcg/kg/min)", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
+
+            if "DOSIS" in calc_modo:
+                vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
+                if droga_mg > 0 and volumen_ml > 0:
+                    dosis_calc = calcular_dosis_mcg_kg_min(peso_paciente, droga_mg, volumen_ml, vel_mlh)
+                    st.success(f"**Resultado:** {dosis_calc:.4f} mcg/kg/min")
+            else:
+                dosis_obj = st.number_input("Dosis indicada (mcg/kg/min)", min_value=0.0, value=0.0, format="%.4f")
+                if droga_mg > 0 and volumen_ml > 0:
+                    vel_calc = calcular_velocidad_ml_h(peso_paciente, droga_mg, volumen_ml, dosis_obj)
+                    st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
+
+        # --- CAMPOS DE TEXTO ORIGINALES ---
         i1, i2 = st.columns(2)
         sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: "
         sedo = i1.text_area("Sedoanalgesia", sedo_def, height=180)
@@ -332,7 +371,6 @@ with tab_lab:
         urea = q1.text_input("Urea (mg/dL)")
         cr = q2.text_input("Cr (mg/dL)")
         na = q3.text_input("Na (mEq/L)")
-        # Aislamiento nominal de la variable Potasio para evitar Shadowing
         potasio = q4.text_input("K (mEq/L)")
         cl = q5.text_input("Cl (mEq/L)")
         mg = q6.text_input("Mg (mg/dL)")
@@ -399,7 +437,6 @@ with tab_planes:
         }
         f_cols = st.columns(5)
         fast_sel = []
-        # Reemplazo nominal: uso de 'letra' y 'descripcion'
         for i, (letra, descripcion) in enumerate(fast_dict.items()):
             if f_cols[i % 5].checkbox(letra, help=descripcion):
                 fast_sel.append(f"{letra} - {descripcion}")
@@ -412,6 +449,7 @@ with tab_planes:
     st.divider()
     if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
 
+        # Diccionario predefinido para inserción automática de unidades
         dict_unidades = {
             "Fentanilo": "gammas/h", "Remifentanilo": "gammas/kg/min", "Morfina": "mg/h",
             "Propofol": "mg/kg/h", "Midazolam": "mg/h", "Dexmedetomidina": "gammas/kg/h",
@@ -449,7 +487,6 @@ with tab_planes:
         l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "/mm³")])
         l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
 
-        # Inserción de variable 'potasio'
         l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
         l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
         l_biom = construir_linea_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
