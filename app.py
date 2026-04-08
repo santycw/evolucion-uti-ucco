@@ -4,6 +4,10 @@ import json
 import os
 import datetime
 
+# --- INICIALIZACIÓN DE ESTADO (Para el Botón de Limpieza) ---
+if 'evolucion_generada' not in st.session_state:
+    st.session_state['evolucion_generada'] = False
+
 # --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
 def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg, valor_input, unidad_objetivo):
     """
@@ -75,7 +79,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.9 | UI Optimizada: Modo Oscuro, Contraste Corregido y Calculadora Integrada")
+st.caption("v3.1 | Implementación de Estado de Sesión (Botón de Limpieza General)")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -257,28 +261,30 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES MULTI-DROGA ---
+        # --- CALCULADORA DE INFUSIONES MULTI-DROGA (ACTUALIZADA S/ SATI) ---
         with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=False):
             st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
 
-            # Diccionario de drogas y sus respectivas unidades estándar
             dict_calc_drogas = {
                 "Noradrenalina": "mcg/kg/min",
                 "Adrenalina": "mcg/kg/min",
                 "Dobutamina": "mcg/kg/min",
-                "Atracurio": "mcg/kg/min",
-                "Propofol": "mg/kg/h",
-                "Dexmedetomidina": "mcg/kg/h",
                 "Fentanilo": "mcg/h",
-                "Midazolam": "mg/h",
+                "Remifentanilo": "mcg/kg/h",
                 "Morfina": "mg/h",
+                "Propofol": "mg/kg/h",
+                "Midazolam": "mg/kg/h",
+                "Dexmedetomidina": "mcg/kg/h",
+                "Ketamina": "mg/kg/h",
+                "Atracurio": "mg/kg/h",
+                "Pancuronio": "mg/kg/h",
                 "Vasopresina": "UI/min"
             }
 
             droga_sel = st.selectbox("Seleccione el fármaco:", list(dict_calc_drogas.keys()))
             unidad_activa = dict_calc_drogas[droga_sel]
 
-            st.caption(f"Unidad estándar para **{droga_sel}**: `{unidad_activa}`")
+            st.caption(f"Unidad estándar recomendada para **{droga_sel}**: `{unidad_activa}`")
 
             c_calc1, c_calc2 = st.columns(2)
             lbl_droga = "Cantidad total (mg)" if "UI" not in unidad_activa else "Cantidad total (UI)"
@@ -508,12 +514,38 @@ with tab_planes:
         plan = st.text_area("Plan 24hs", "- Cultivar: \n- Interconsultas:")
 
     st.divider()
-    if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
+
+    # --- BOTONES DE CONTROL GENERAL ---
+    col_gen, col_limp = st.columns(2)
+
+    btn_generar = col_gen.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary")
+
+    if btn_generar:
+        st.session_state['evolucion_generada'] = True
+
+    btn_limpiar = col_limp.button("🧹 LIMPIAR PLANILLA", use_container_width=True, disabled=not st.session_state['evolucion_generada'])
+
+    if btn_limpiar:
+        st.session_state.clear()
+        st.rerun()
+
+    if btn_generar:
 
         dict_unidades = {
-            "Fentanilo": "gammas/h", "Remifentanilo": "gammas/kg/min", "Morfina": "mg/h",
-            "Propofol": "mg/kg/h", "Midazolam": "mg/h", "Dexmedetomidina": "gammas/kg/h",
-            "Noradrenalina": "gammas/kg/min", "Vasopresina": "UI/min", "Adrenalina": "gammas/kg/min"
+            "Fentanilo": "mcg/h",
+            "Remifentanilo": "mcg/kg/h",
+            "Morfina": "mg/h",
+            "Propofol": "mg/kg/h",
+            "Midazolam": "mg/kg/h",
+            "Dexmedetomidina": "mcg/kg/h",
+            "Ketamina": "mg/kg/h",
+            "Atracurio": "mg/kg/h",
+            "Pancuronio": "mg/kg/h",
+            "Noradrenalina": "mcg/kg/min",
+            "Adrenalina": "mcg/kg/min",
+            "Dobutamina": "mcg/kg/min",
+            "Milrinona": "mcg/kg/min",
+            "Vasopresina": "UI/min"
         }
 
         def procesar_drogas(texto_area):
