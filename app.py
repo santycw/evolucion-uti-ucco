@@ -4,73 +4,57 @@ import json
 import os
 import datetime
 
-# --- INICIALIZACIÓN DE ESTADO (Para el Botón de Limpieza) ---
+# --- INICIALIZACIÓN DE ESTADOS DE SESIÓN ---
 if 'evolucion_generada' not in st.session_state:
     st.session_state['evolucion_generada'] = False
+if 'infusiones_automatizadas' not in st.session_state:
+    st.session_state['infusiones_automatizadas'] = []
 
 # --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
 def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg, valor_input, unidad_objetivo):
-    """
-    Calcula dosis o velocidad dinámicamente analizando la unidad farmacológica.
-    Soporta conversiones automáticas de masa (mg -> mcg), peso (con/sin kg) y tiempo (h -> min).
-    """
     if volumen_ml == 0 or cantidad_droga_mg_ui == 0:
         return 0.0
 
-    # 1. Concentración base en mg/ml o UI/ml
     conc_base = cantidad_droga_mg_ui / volumen_ml
 
-    # 2. Factor de conversión de masa (Si la unidad usa microgramos/gammas)
     if "mcg" in unidad_objetivo or "gammas" in unidad_objetivo:
         conc_final = conc_base * 1000
     else:
         conc_final = conc_base
 
-    # 3. Factor de dependencia del peso
     usa_peso = "kg" in unidad_objetivo
     peso_factor = peso_kg if usa_peso else 1.0
 
-    # 4. Factor de tiempo (Si la unidad se mide por minuto en lugar de hora)
     usa_min = "min" in unidad_objetivo
     tiempo_factor = 60.0 if usa_min else 1.0
 
-    # Ejecución del cálculo bidireccional
     if modo == "DOSIS":
-        # valor_input equivale a la Velocidad en ml/h
         dosis = (valor_input * conc_final) / (peso_factor * tiempo_factor)
         return dosis
     else:
-        # valor_input equivale a la Dosis objetivo
         velocidad = (valor_input * peso_factor * tiempo_factor) / conc_final
         return velocidad
 
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PERSONALIZADO (Diseño Oscuro, Moderno y Legible) ---
+# --- CSS PERSONALIZADO (Diseño Oscuro y Moderno) ---
 st.markdown("""
     <style>
-    /* Tipografía técnica para los inputs */
     .stTextArea textarea, .stTextInput input, .stNumberInput input {
         font-family: 'Consolas', monospace;
         font-size: 14px;
     }
-
-    /* Rediseño de los contenedores (Expanders) para adaptarse al Modo Oscuro */
     div[data-testid="stExpander"] {
-        background-color: #1E1E1E !important; /* Fondo oscuro elegante */
+        background-color: #1E1E1E !important;
         border-radius: 8px;
         border: 1px solid #333333;
     }
-
-    /* Forzar contraste de texto dentro de la calculadora para asegurar legibilidad */
     div[data-testid="stExpander"] label,
     div[data-testid="stExpander"] p,
     div[data-testid="stExpander"] .stMarkdown {
         color: #F0F2F6 !important;
     }
-
-    /* Bordes sutiles para los bloques principales */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
         border-color: #333333 !important;
         border-radius: 8px;
@@ -79,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v3.1 | Implementación de Estado de Sesión (Botón de Limpieza General)")
+st.caption("v3.2 | Integración Automatizada de Calculadora a Reporte Final")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -261,7 +245,7 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES MULTI-DROGA (ACTUALIZADA S/ SATI) ---
+        # --- CALCULADORA DE INFUSIONES MULTI-DROGA Y GUARDADO AUTOMÁTICO ---
         with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=False):
             st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
 
@@ -293,23 +277,49 @@ with tab_clinca:
 
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
 
+            # Zona de resultados e inyección a memoria
             if "DOSIS" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
                 if droga_mg > 0 and volumen_ml > 0:
                     dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
+
+                    if st.button(f"➕ Anexar {droga_sel} a la Evolución"):
+                        item = f"{droga_sel}: {dosis_calc:.4f} {unidad_activa}"
+                        if item not in st.session_state['infusiones_automatizadas']:
+                            st.session_state['infusiones_automatizadas'].append(item)
+                            st.rerun() # Refresca UI para mostrar la lista
+
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f")
                 if droga_mg > 0 and volumen_ml > 0:
                     vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
 
+                    if st.button(f"➕ Anexar {droga_sel} a la Evolución"):
+                        # Para el reporte clínico documentamos la DOSIS, no la velocidad de la bomba
+                        item = f"{droga_sel}: {dosis_obj:.4f} {unidad_activa}"
+                        if item not in st.session_state['infusiones_automatizadas']:
+                            st.session_state['infusiones_automatizadas'].append(item)
+                            st.rerun() # Refresca UI para mostrar la lista
+
+            # --- VISOR DE MEMORIA ACTIVA ---
+            if st.session_state['infusiones_automatizadas']:
+                st.markdown("---")
+                st.caption("📋 **Infusiones en memoria (Listas para el reporte):**")
+                for inf in st.session_state['infusiones_automatizadas']:
+                    st.markdown(f"- `{inf}`")
+
+                if st.button("🗑️ Borrar memoria de infusiones", key="borrar_infusiones"):
+                    st.session_state['infusiones_automatizadas'] = []
+                    st.rerun()
+
         # --- CAMPOS DE TEXTO ORIGINALES ---
         i1, i2 = st.columns(2)
         sedo_def = "Fentanilo: \nRemifentanilo: \nMorfina: \nPropofol: \nMidazolam: \nDexmedetomidina: \nKetamina: "
-        sedo = i1.text_area("Sedoanalgesia", sedo_def, height=180)
+        sedo = i1.text_area("Sedoanalgesia (Manual)", sedo_def, height=180)
         vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLabetalol: "
-        vaso = i2.text_area("Vasoactivos", vaso_def, height=180)
+        vaso = i2.text_area("Vasoactivos (Manual)", vaso_def, height=180)
 
         st.caption("Invasiones")
         d1, d2, d3, d4 = st.columns(4)
@@ -531,6 +541,7 @@ with tab_planes:
 
     if btn_generar:
 
+        # Diccionario de respaldo para los campos manuales
         dict_unidades = {
             "Fentanilo": "mcg/h",
             "Remifentanilo": "mcg/kg/h",
@@ -561,6 +572,11 @@ with tab_planes:
 
         sedo_clean = procesar_drogas(sedo)
         vaso_clean = procesar_drogas(vaso)
+
+        # --- ENSAMBLE DE INFUSIONES AUTOMATIZADAS ---
+        str_automatizadas = ""
+        if st.session_state['infusiones_automatizadas']:
+            str_automatizadas = "\nInfusiones Calculadas: " + " | ".join(st.session_state['infusiones_automatizadas'])
 
         # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL (SIN TÍTULOS) ---
         def construir_linea_lab(items):
@@ -677,6 +693,7 @@ with tab_planes:
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
+        # Inyección de las variables manuales y automatizadas combinadas
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
@@ -687,8 +704,8 @@ DIAGNÓSTICO:{txt_mod}
 
 (O) OBJETIVO:
 >> INFUSIONES Y DISPOSITIVOS:
-Sedoanalgesia: {sedo_clean}
-Vasoactivos: {vaso_clean}
+Sedoanalgesia (Manual): {sedo_clean}
+Vasoactivos (Manual): {vaso_clean}{str_automatizadas}
 Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
