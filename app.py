@@ -4,22 +4,41 @@ import json
 import os
 import datetime
 
-# --- FUNCIONES DE CÁLCULO DE INFUSIONES ---
-def calcular_dosis_mcg_kg_min(peso_kg, cantidad_droga_mg, volumen_dilucion_ml, velocidad_ml_h):
-    if volumen_dilucion_ml == 0 or peso_kg == 0:
+# --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
+def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg, valor_input, unidad_objetivo):
+    """
+    Calcula dosis o velocidad dinámicamente analizando la unidad farmacológica.
+    Soporta conversiones automáticas de masa (mg -> mcg), peso (con/sin kg) y tiempo (h -> min).
+    """
+    if volumen_ml == 0 or cantidad_droga_mg_ui == 0:
         return 0.0
-    concentracion_mg_ml = cantidad_droga_mg / volumen_dilucion_ml
-    concentracion_mcg_ml = concentracion_mg_ml * 1000
-    dosis_mcg_min = (velocidad_ml_h * concentracion_mcg_ml) / 60
-    return dosis_mcg_min / peso_kg
 
-def calcular_velocidad_ml_h(peso_kg, cantidad_droga_mg, volumen_dilucion_ml, dosis_mcg_kg_min):
-    if volumen_dilucion_ml == 0 or cantidad_droga_mg == 0:
-        return 0.0
-    concentracion_mg_ml = cantidad_droga_mg / volumen_dilucion_ml
-    concentracion_mcg_ml = concentracion_mg_ml * 1000
-    dosis_mcg_min = dosis_mcg_kg_min * peso_kg
-    return (dosis_mcg_min * 60) / concentracion_mcg_ml
+    # 1. Concentración base en mg/ml o UI/ml
+    conc_base = cantidad_droga_mg_ui / volumen_ml
+
+    # 2. Factor de conversión de masa (Si la unidad usa microgramos/gammas)
+    if "mcg" in unidad_objetivo or "gammas" in unidad_objetivo:
+        conc_final = conc_base * 1000
+    else:
+        conc_final = conc_base
+
+    # 3. Factor de dependencia del peso
+    usa_peso = "kg" in unidad_objetivo
+    peso_factor = peso_kg if usa_peso else 1.0
+
+    # 4. Factor de tiempo (Si la unidad se mide por minuto en lugar de hora)
+    usa_min = "min" in unidad_objetivo
+    tiempo_factor = 60.0 if usa_min else 1.0
+
+    # Ejecución del cálculo bidireccional
+    if modo == "DOSIS":
+        # valor_input equivale a la Velocidad en ml/h
+        dosis = (valor_input * conc_final) / (peso_factor * tiempo_factor)
+        return dosis
+    else:
+        # valor_input equivale a la Dosis objetivo
+        velocidad = (valor_input * peso_factor * tiempo_factor) / conc_final
+        return velocidad
 
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
@@ -35,7 +54,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.7 | Módulo Integrado de Cálculo Farmacológico (mcg/kg/min)")
+st.caption("v2.8 | Módulo Multi-Droga con Cálculo Dinámico de Unidades")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -217,24 +236,45 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES INTEGRADA ---
-        with st.expander("🧮 Calculadora de Infusiones (mcg/kg/min)", expanded=False):
-            st.info("💡 Utilice esta herramienta para calcular dosis de fármacos dependientes del peso (ej. Noradrenalina, Adrenalina). El peso actual configurado es: **{} kg**.".format(peso_paciente))
+        # --- CALCULADORA DE INFUSIONES MULTI-DROGA ---
+        with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=False):
+            st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
+
+            # Diccionario de drogas y sus respectivas unidades estándar
+            dict_calc_drogas = {
+                "Noradrenalina": "mcg/kg/min",
+                "Adrenalina": "mcg/kg/min",
+                "Dobutamina": "mcg/kg/min",
+                "Atracurio": "mcg/kg/min",
+                "Propofol": "mg/kg/h",
+                "Dexmedetomidina": "mcg/kg/h",
+                "Fentanilo": "mcg/h",
+                "Midazolam": "mg/h",
+                "Morfina": "mg/h",
+                "Vasopresina": "UI/min"
+            }
+
+            droga_sel = st.selectbox("Seleccione el fármaco:", list(dict_calc_drogas.keys()))
+            unidad_activa = dict_calc_drogas[droga_sel]
+
+            st.caption(f"Unidad estándar para **{droga_sel}**: `{unidad_activa}`")
+
             c_calc1, c_calc2 = st.columns(2)
-            droga_mg = c_calc1.number_input("Cantidad de Droga (mg)", min_value=0.0, value=0.0, step=1.0)
+            lbl_droga = "Cantidad total (mg)" if "UI" not in unidad_activa else "Cantidad total (UI)"
+            droga_mg = c_calc1.number_input(lbl_droga, min_value=0.0, value=0.0, step=1.0)
             volumen_ml = c_calc2.number_input("Volumen de Dilución (ml)", min_value=0.0, value=0.0, step=10.0)
 
-            calc_modo = st.radio("Dirección del cálculo", ["Calcular DOSIS (mcg/kg/min)", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
+            calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
 
             if "DOSIS" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
                 if droga_mg > 0 and volumen_ml > 0:
-                    dosis_calc = calcular_dosis_mcg_kg_min(peso_paciente, droga_mg, volumen_ml, vel_mlh)
-                    st.success(f"**Resultado:** {dosis_calc:.4f} mcg/kg/min")
+                    dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
+                    st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
             else:
-                dosis_obj = st.number_input("Dosis indicada (mcg/kg/min)", min_value=0.0, value=0.0, format="%.4f")
+                dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f")
                 if droga_mg > 0 and volumen_ml > 0:
-                    vel_calc = calcular_velocidad_ml_h(peso_paciente, droga_mg, volumen_ml, dosis_obj)
+                    vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
 
         # --- CAMPOS DE TEXTO ORIGINALES ---
@@ -437,6 +477,7 @@ with tab_planes:
         }
         f_cols = st.columns(5)
         fast_sel = []
+        # Reemplazo nominal
         for i, (letra, descripcion) in enumerate(fast_dict.items()):
             if f_cols[i % 5].checkbox(letra, help=descripcion):
                 fast_sel.append(f"{letra} - {descripcion}")
@@ -449,7 +490,6 @@ with tab_planes:
     st.divider()
     if st.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary"):
 
-        # Diccionario predefinido para inserción automática de unidades
         dict_unidades = {
             "Fentanilo": "gammas/h", "Remifentanilo": "gammas/kg/min", "Morfina": "mg/h",
             "Propofol": "mg/kg/h", "Midazolam": "mg/h", "Dexmedetomidina": "gammas/kg/h",
