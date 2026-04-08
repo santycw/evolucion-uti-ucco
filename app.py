@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v3.3 | Unificación de Sedoanalgesia y Fentanilo en mcg/kg/h")
+st.caption("v3.4 | Automatización Total: Supresión de campos manuales de infusión")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -245,15 +245,15 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES MULTI-DROGA Y GUARDADO AUTOMÁTICO ---
-        with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=False):
+        # --- CALCULADORA DE INFUSIONES (FUENTE EXCLUSIVA DE DROGAS) ---
+        with st.expander("🧮 Calculadora de Infusiones Farmacológicas (Fuente GECLISA)", expanded=True):
             st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
 
-            # Fentanilo actualizado a mcg/kg/h
             dict_calc_drogas = {
                 "Noradrenalina": "mcg/kg/min",
                 "Adrenalina": "mcg/kg/min",
                 "Dobutamina": "mcg/kg/min",
+                "Milrinona": "mcg/kg/min", # Incorporada de la lista manual anterior
                 "Fentanilo": "mcg/kg/h",
                 "Remifentanilo": "mcg/kg/h",
                 "Morfina": "mg/h",
@@ -266,10 +266,10 @@ with tab_clinca:
                 "Vasopresina": "UI/min"
             }
 
-            droga_sel = st.selectbox("Seleccione el fármaco:", list(dict_calc_drogas.keys()))
+            droga_sel = st.selectbox("Seleccione el fármaco a inyectar en la evolución:", list(dict_calc_drogas.keys()))
             unidad_activa = dict_calc_drogas[droga_sel]
 
-            st.caption(f"Unidad estándar recomendada para **{droga_sel}**: `{unidad_activa}`")
+            st.caption(f"Unidad estándar para **{droga_sel}**: `{unidad_activa}`")
 
             c_calc1, c_calc2 = st.columns(2)
             lbl_droga = "Cantidad total (mg)" if "UI" not in unidad_activa else "Cantidad total (UI)"
@@ -278,18 +278,17 @@ with tab_clinca:
 
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
 
-            # Zona de resultados e inyección a memoria
             if "DOSIS" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
                 if droga_mg > 0 and volumen_ml > 0:
                     dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
 
-                    if st.button(f"➕ Anexar {droga_sel} a la Evolución"):
+                    if st.button(f"➕ Anexar {droga_sel} a la Evolución", type="secondary"):
                         item = f"{droga_sel}: {dosis_calc:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
-                            st.rerun() # Refresca UI para mostrar la lista
+                            st.rerun()
 
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f")
@@ -297,16 +296,16 @@ with tab_clinca:
                     vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
 
-                    if st.button(f"➕ Anexar {droga_sel} a la Evolución"):
+                    if st.button(f"➕ Anexar {droga_sel} a la Evolución", type="secondary"):
                         item = f"{droga_sel}: {dosis_obj:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
-                            st.rerun() # Refresca UI para mostrar la lista
+                            st.rerun()
 
             # --- VISOR DE MEMORIA ACTIVA ---
             if st.session_state['infusiones_automatizadas']:
                 st.markdown("---")
-                st.caption("📋 **Sedoanalgesia e Infusiones en memoria:**")
+                st.caption("📋 **Infusiones activas en memoria:**")
                 for inf in st.session_state['infusiones_automatizadas']:
                     st.markdown(f"- `{inf}`")
 
@@ -314,11 +313,8 @@ with tab_clinca:
                     st.session_state['infusiones_automatizadas'] = []
                     st.rerun()
 
-        # --- CAMPO MANUAL REDUCIDO A VASOACTIVOS ---
-        vaso_def = "Noradrenalina: \nVasopresina: \nAdrenalina: \nDobutamina: \nMilrinona: \nLabetalol: "
-        vaso = st.text_area("Vasoactivos (Manual)", vaso_def, height=130)
-
-        st.caption("Invasiones")
+        # --- SECCIÓN DE INVASIONES ---
+        st.caption("Invasiones / Accesos")
         d1, d2, d3, d4 = st.columns(4)
         cvc_info = d1.text_input("CVC (Sitio/Día)")
         ca_info = d2.text_input("Cat. Art (Sitio/Día)")
@@ -538,32 +534,11 @@ with tab_planes:
 
     if btn_generar:
 
-        # Diccionario de respaldo para campos manuales
-        dict_unidades = {
-            "Noradrenalina": "mcg/kg/min",
-            "Adrenalina": "mcg/kg/min",
-            "Dobutamina": "mcg/kg/min",
-            "Milrinona": "mcg/kg/min",
-            "Vasopresina": "UI/min"
-        }
-
-        def procesar_drogas(texto_area):
-            lista = []
-            for line in texto_area.split('\n'):
-                if ':' in line:
-                    d, dosis = line.split(':', 1)
-                    d, dosis = d.strip(), dosis.strip()
-                    if dosis:
-                        uni = dict_unidades.get(d, "") if not re.search(r'[a-zA-Z]', dosis) else ""
-                        lista.append(f"{d}: {dosis} {uni}".strip())
-            return " | ".join(lista) if lista else "Sin infusiones."
-
-        vaso_clean = procesar_drogas(vaso)
-
-        # --- ENSAMBLE DE INFUSIONES AUTOMATIZADAS (Sedoanalgesia y otras calculadas) ---
-        str_automatizadas = "Sin infusiones en calculadora."
+        # --- ENSAMBLE EXCLUSIVO DE INFUSIONES AUTOMATIZADAS ---
         if st.session_state['infusiones_automatizadas']:
             str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas'])
+        else:
+            str_automatizadas = "Sin infusiones activas."
 
         # --- RUTINA DE LIMPIEZA DE LABORATORIO INTEGRAL (SIN TÍTULOS) ---
         def construir_linea_lab(items):
@@ -680,7 +655,7 @@ with tab_planes:
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
-        # Inyección de las variables manuales y automatizadas combinadas
+        # Inyección de la variable automatizada
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
@@ -691,8 +666,7 @@ DIAGNÓSTICO:{txt_mod}
 
 (O) OBJETIVO:
 >> INFUSIONES Y DISPOSITIVOS:
-Sedoanalgesia e Infusiones: {str_automatizadas}
-Vasoactivos (Manual): {vaso_clean}
+Infusiones Activas: {str_automatizadas}
 Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
