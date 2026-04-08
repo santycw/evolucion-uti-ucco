@@ -43,18 +43,39 @@ def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg,
 # Configuración de página con layout extendido
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PERSONALIZADO ---
+# --- CSS PERSONALIZADO (Diseño Oscuro, Moderno y Legible) ---
 st.markdown("""
     <style>
-    .main { background-color: #f4f6f9; }
-    .stTextArea textarea, .stTextInput input { font-family: 'Consolas', monospace; font-size: 14px; }
-    div[data-testid="stExpander"] { background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: none; }
-    div[data-testid="stForm"] { border-radius: 8px; background-color: #ffffff; }
+    /* Tipografía técnica para los inputs */
+    .stTextArea textarea, .stTextInput input, .stNumberInput input {
+        font-family: 'Consolas', monospace;
+        font-size: 14px;
+    }
+
+    /* Rediseño de los contenedores (Expanders) para adaptarse al Modo Oscuro */
+    div[data-testid="stExpander"] {
+        background-color: #1E1E1E !important; /* Fondo oscuro elegante */
+        border-radius: 8px;
+        border: 1px solid #333333;
+    }
+
+    /* Forzar contraste de texto dentro de la calculadora para asegurar legibilidad */
+    div[data-testid="stExpander"] label,
+    div[data-testid="stExpander"] p,
+    div[data-testid="stExpander"] .stMarkdown {
+        color: #F0F2F6 !important;
+    }
+
+    /* Bordes sutiles para los bloques principales */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        border-color: #333333 !important;
+        border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v2.8 | Módulo Multi-Droga con Cálculo Dinámico de Unidades")
+st.caption("v2.9 | UI Optimizada: Modo Oscuro, Contraste Corregido y Calculadora Integrada")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -477,7 +498,6 @@ with tab_planes:
         }
         f_cols = st.columns(5)
         fast_sel = []
-        # Reemplazo nominal
         for i, (letra, descripcion) in enumerate(fast_dict.items()):
             if f_cols[i % 5].checkbox(letra, help=descripcion):
                 fast_sel.append(f"{letra} - {descripcion}")
