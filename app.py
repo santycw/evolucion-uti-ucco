@@ -263,6 +263,7 @@ with tab_clinca:
         neuro_estado, glasgow, rass, cam = n1.text_input("Estado", "Alerta"), n2.text_input("GCS", "15/15"), n3.text_input("RASS", "0"), n4.text_input("CAM", "-")
         h1, h2, h3, h4, h5 = st.columns(5)
         ta, fc, fr, sat, temp = h1.text_input("TA", placeholder="120/80"), h2.text_input("FC (lpm)"), h3.text_input("FR"), h4.text_input("Sat (%)"), h5.text_input("Temp (°C)")
+
         tam_val, pp_val = "", ""
         if "/" in ta:
             try:
@@ -521,8 +522,8 @@ with tab_planes:
 
         signos_vitales = f"""- SIGNOS VITALES:
   TA: {ta if ta.strip() else '-'} mmHg
-  TAM: {tam_str} mmHg
-  PP: {pp_str} mmHg
+  TAM: {tam_val if tam_val != "" else '-'} mmHg
+  PP: {pp_val if pp_val != "" else '-'} mmHg
   PR: {fc if fc.strip() else '-'} lpm
   PVC: {pvc if pvc.strip() else '-'} cmH2O
   Rell. Capilar: {relleno_cap if relleno_cap.strip() else '-'}
