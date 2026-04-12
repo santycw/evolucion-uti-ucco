@@ -34,7 +34,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v4.5 | Auto-Scores Avanzados (RCCC): MDRD4, CKD-EPI, APACHE II, MELD, TIMI, Ranson")
+st.caption("v4.6 | Auto-Scores Avanzados y Corrección de IDs duplicados")
 
 # --- PANEL LATERAL (DATOS GENERALES) ---
 with st.sidebar:
@@ -245,7 +245,9 @@ with tab_clinca:
         n1, n2, n3, n4 = st.columns(4)
         neuro_estado, glasgow, rass, cam = n1.text_input("Estado", "Alerta"), n2.text_input("GCS", "15/15"), n3.text_input("RASS", "0"), n4.text_input("CAM", "-")
         h1, h2, h3, h4, h5 = st.columns(5)
-        ta, fc, fr, sat, temp = h1.text_input("TA", placeholder="120/80"), h2.text_input("FC (lpm)"), h3.text_input("FR"), h4.text_input("Sat (%)"), h5.text_input("Temp (°C)")
+
+        # KEY ASIGNADA PARA EVITAR DUPLICADO CON ECG
+        ta, fc, fr, sat, temp = h1.text_input("TA", placeholder="120/80"), h2.text_input("FC (lpm)", key="fc_sv"), h3.text_input("FR"), h4.text_input("Sat (%)"), h5.text_input("Temp (°C)")
 
         tam_val, pp_val = "", ""
         if "/" in ta:
@@ -294,7 +296,9 @@ with tab_clinca:
         i_1, i_2 = st.columns(2)
         atb1, atb2 = i_1.text_input("ATB 1 y Día"), i_2.text_input("ATB 2 y Día")
         c_1, c_2, c_3, c_4 = st.columns(4)
-        cult_hemo, cult_uro, cult_resp, cult_otros = c_1.text_input("Hemocultivos"), c_2.text_input("Urocultivo"), c_3.text_input("Respiratorios"), c_4.text_input("Otros")
+
+        # KEY ASIGNADA PARA EVITAR DUPLICADO CON IMÁGENES
+        cult_hemo, cult_uro, cult_resp, cult_otros = c_1.text_input("Hemocultivos"), c_2.text_input("Urocultivo"), c_3.text_input("Respiratorios"), c_4.text_input("Otros", key="otros_cult")
 
 with tab_lab:
     st.info("💡 Solo se imprimirán los valores completados.")
@@ -333,7 +337,10 @@ with tab_estudios:
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
         ec1, ec2, ec3, ec4, ec5 = st.columns(5)
-        ecg_fc, ecg_ritmo, ecg_eje, ecg_onda_p, ecg_long_p = ec1.text_input("FC (lpm)"), ec2.text_input("Ritmo"), ec3.text_input("Eje (°)"), ec4.text_input("Onda P (Morf.)"), ec5.text_input("Long. P (ms)")
+
+        # KEY ASIGNADA PARA EVITAR DUPLICADO CON SIGNOS VITALES
+        ecg_fc, ecg_ritmo, ecg_eje, ecg_onda_p, ecg_long_p = ec1.text_input("FC (lpm)", key="fc_ecg"), ec2.text_input("Ritmo"), ec3.text_input("Eje (°)"), ec4.text_input("Onda P (Morf.)"), ec5.text_input("Long. P (ms)")
+
         ec6, ec7, ec8, ec9, ec10 = st.columns(5)
         ecg_pr, ecg_qrs, ecg_qt = ec6.text_input("PR (ms)"), ec7.text_input("QRS (ms)"), ec8.text_input("QT (ms)")
 
@@ -347,7 +354,9 @@ with tab_estudios:
 
     with st.container(border=True):
         st.subheader("🩻 Imágenes y Procedimientos")
-        rx_torax, tc, eco, otros_estudios = st.text_area("Rx Tórax", height=68), st.text_area("TC", height=68), st.text_area("POCUS", height=68), st.text_area("Otros", height=68)
+
+        # KEY ASIGNADA PARA EVITAR DUPLICADO CON CULTIVOS
+        rx_torax, tc, eco, otros_estudios = st.text_area("Rx Tórax", height=68), st.text_area("TC", height=68), st.text_area("POCUS", height=68), st.text_area("Otros", height=68, key="otros_img")
 
 with tab_planes:
     with st.container(border=True):
