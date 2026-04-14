@@ -34,7 +34,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v4.6 | Auto-Scores Avanzados y Corrección de IDs duplicados")
+st.caption("v4.7 | Formato SOAP dinámico, Auto-Scores Avanzados y Limpieza Inteligente")
 
 # --- PANEL LATERAL (DATOS GENERALES) ---
 with st.sidebar:
@@ -49,7 +49,7 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos (Activan scores):", "1. \n2. ", height=120)
+        diagnostico = st.text_area("Diagnósticos (Activan scores):", placeholder="1. Neumonía\n2. Sepsis...", height=120)
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
@@ -194,7 +194,7 @@ tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs(["🩺 Clínica y Examen
 with tab_clinca:
     with st.container(border=True):
         st.subheader("(S) Subjetivo")
-        subj = st.text_area("Novedades:", "Paciente estable.", height=68)
+        subj = st.text_area("Novedades:", placeholder="Paciente refiere...", height=68)
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
@@ -238,15 +238,14 @@ with tab_clinca:
                     st.rerun()
 
         d1, d2, d3, d4 = st.columns(4)
-        cvc_info, ca_info, sv_dias, sng_dias = d1.text_input("CVC (Día)"), d2.text_input("Cat. Art (Día)"), d3.text_input("SV (Día)"), d4.text_input("SNG (Día)")
+        cvc_info, ca_info, sv_dias, sng_dias = d1.text_input("CVC (Día)", placeholder="Ej: Subclavia D (D2)"), d2.text_input("Cat. Art (Día)"), d3.text_input("SV (Día)"), d4.text_input("SNG (Día)")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
         n1, n2, n3, n4 = st.columns(4)
-        neuro_estado, glasgow, rass, cam = n1.text_input("Estado", "Alerta"), n2.text_input("GCS", "15/15"), n3.text_input("RASS", "0"), n4.text_input("CAM", "-")
+        neuro_estado, glasgow, rass, cam = n1.text_input("Estado", placeholder="Ej: Alerta"), n2.text_input("GCS", placeholder="Ej: 15"), n3.text_input("RASS", placeholder="Ej: 0"), n4.text_input("CAM", placeholder="Ej: Negativo")
         h1, h2, h3, h4, h5 = st.columns(5)
 
-        # KEY ASIGNADA PARA EVITAR DUPLICADO CON ECG
         ta, fc, fr, sat, temp = h1.text_input("TA", placeholder="120/80"), h2.text_input("FC (lpm)", key="fc_sv"), h3.text_input("FR"), h4.text_input("Sat (%)"), h5.text_input("Temp (°C)")
 
         tam_val, pp_val = "", ""
@@ -259,45 +258,49 @@ with tab_clinca:
 
         v1, v2 = st.columns(2)
         pvc = v1.text_input("PVC (cmH2O)")
-        relleno_cap = v2.text_input("Relleno Capilar", "< 2 seg")
-        ex_cv = st.text_area("Ex. Cardiovascular", "R1/R2 normofonéticos.")
+        relleno_cap = v2.text_input("Relleno Capilar", placeholder="Ej: < 2 seg")
+        ex_cv = st.text_area("Ex. Cardiovascular", placeholder="Ej: R1/R2 normofonéticos. Sin soplos.")
 
     with st.container(border=True):
         st.subheader("2. Respiratorio y ARM")
         r_b1, r_b2, r_b3 = st.columns(3)
-        via_aerea = r_b1.text_input("Vía Aérea", "TOT") if paciente_ventilado else r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Reservorio", "CAF", "VNI", "TQTAA"])
-        fio2 = r_b2.number_input("FiO2 (%)", 21, 100, 21)
+        via_aerea = r_b1.text_input("Vía Aérea", placeholder="Ej: TOT") if paciente_ventilado else r_b1.selectbox("Dispositivo O2", ["", "AA (Aire Ambiente)", "Cánula Nasal", "Máscara Reservorio", "CAF", "VNI", "TQTAA"])
+        fio2 = r_b2.number_input("FiO2 (%)", min_value=21, max_value=100, value=21)
         pafi_manual = r_b3.text_input("PaFiO2 (Opcional)")
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
         if paciente_ventilado:
             st.info("⚙️ Consola de Mecánica Respiratoria Activa")
             r1, r2, r3, r4 = st.columns(4)
-            modo, peep, vt, dp_manual = r1.text_input("Modo", "VCV"), r2.number_input("PEEP", 0, 30, 5), r3.text_input("Vt (ml)"), r4.text_input("Driving P.")
+            modo, peep, vt, dp_manual = r1.text_input("Modo", placeholder="Ej: VCV"), r2.number_input("PEEP", 0, 30, 5), r3.text_input("Vt (ml)"), r4.text_input("Driving P.")
             r5, r6, r7 = st.columns(3)
             ppico, pplat, comp = r5.text_input("P.Pico"), r6.text_input("P.Plateau"), r7.text_input("Comp.")
 
-        ex_resp = st.text_input("Examen Respiratorio", "Buena entrada de aire bilateral.")
+        ex_resp = st.text_input("Examen Respiratorio", placeholder="Ej: Buena entrada de aire bilateral.")
 
     with st.container(border=True):
         st.subheader("3. Digestivo y Nutrición")
         a1, a2 = st.columns(2)
-        ex_abd, nutricion = a1.text_input("Abdomen", "Blando, depresible."), a2.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral"])
+        ex_abd, nutricion = a1.text_input("Abdomen", placeholder="Ej: Blando, depresible."), a2.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral"])
 
     with st.container(border=True):
         st.subheader("4. Renal y Balance Hídrico")
-        ex_renal = st.text_input("Diuresis / Ex. Renal", "Conservada.")
+        ex_renal = st.text_input("Diuresis / Ex. Renal", placeholder="Ej: Ritmo diurético conservado.")
         bh1, bh2 = st.columns(2)
         ingresos, egresos = bh1.text_input("Ingresos Totales (ml)"), bh2.text_input("Egresos Totales (ml)")
 
     with st.container(border=True):
         st.subheader("5. Infectología")
         tmax = st.text_input("Temp. Máxima 24h (°C)")
-        i_1, i_2 = st.columns(2)
-        atb1, atb2 = i_1.text_input("ATB 1 y Día"), i_2.text_input("ATB 2 y Día")
-        c_1, c_2, c_3, c_4 = st.columns(4)
 
-        # KEY ASIGNADA PARA EVITAR DUPLICADO CON IMÁGENES
+        # 4 Campos para ATBs
+        at1, at2, at3, at4 = st.columns(4)
+        atb1 = at1.text_input("ATB 1 y Día")
+        atb2 = at2.text_input("ATB 2 y Día")
+        atb3 = at3.text_input("ATB 3 y Día")
+        atb4 = at4.text_input("ATB 4 y Día")
+
+        c_1, c_2, c_3, c_4 = st.columns(4)
         cult_hemo, cult_uro, cult_resp, cult_otros = c_1.text_input("Hemocultivos"), c_2.text_input("Urocultivo"), c_3.text_input("Respiratorios"), c_4.text_input("Otros", key="otros_cult")
 
 with tab_lab:
@@ -310,7 +313,7 @@ with tab_lab:
     with st.container(border=True):
         st.subheader("🩸 Hemograma y Coagulación")
         l1, l2, l3, l4 = st.columns(4)
-        hb, hto, gb, plaq = l1.text_input("Hb (g/dL)"), l2.text_input("Hto (%)"), l3.text_input("GB (/mm³ o mil)"), l4.text_input("Plaq (/mm³ o mil)")
+        hb, hto, gb, plaq = l1.text_input("Hb (g/dL)"), l2.text_input("Hto (%)"), l3.text_input("GB (/mm³)"), l4.text_input("Plaquetas")
         f1, f2, f3, f4 = st.columns(4)
         neut, linf, mono, eos = f1.text_input("Neut %"), f2.text_input("Linf %"), f3.text_input("Mono %"), f4.text_input("Eos %")
         c1, c2, c3 = st.columns(3)
@@ -337,10 +340,7 @@ with tab_estudios:
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
         ec1, ec2, ec3, ec4, ec5 = st.columns(5)
-
-        # KEY ASIGNADA PARA EVITAR DUPLICADO CON SIGNOS VITALES
-        ecg_fc, ecg_ritmo, ecg_eje, ecg_onda_p, ecg_long_p = ec1.text_input("FC (lpm)", key="fc_ecg"), ec2.text_input("Ritmo"), ec3.text_input("Eje (°)"), ec4.text_input("Onda P (Morf.)"), ec5.text_input("Long. P (ms)")
-
+        ecg_fc, ecg_ritmo, ecg_eje, ecg_onda_p, ecg_long_p = ec1.text_input("FC (lpm)", key="fc_ecg"), ec2.text_input("Ritmo"), ec3.text_input("Eje (°)"), ec4.text_input("Onda P"), ec5.text_input("Long. P (ms)")
         ec6, ec7, ec8, ec9, ec10 = st.columns(5)
         ecg_pr, ecg_qrs, ecg_qt = ec6.text_input("PR (ms)"), ec7.text_input("QRS (ms)"), ec8.text_input("QT (ms)")
 
@@ -354,8 +354,6 @@ with tab_estudios:
 
     with st.container(border=True):
         st.subheader("🩻 Imágenes y Procedimientos")
-
-        # KEY ASIGNADA PARA EVITAR DUPLICADO CON CULTIVOS
         rx_torax, tc, eco, otros_estudios = st.text_area("Rx Tórax", height=68), st.text_area("TC", height=68), st.text_area("POCUS", height=68), st.text_area("Otros", height=68, key="otros_img")
 
 with tab_planes:
@@ -367,13 +365,16 @@ with tab_planes:
 
     with st.container(border=True):
         st.subheader("(A/P) Análisis y Plan")
-        analisis, plan = st.text_area("Análisis General", height=150), st.text_area("Plan 24hs", "- Cultivar: \n- Interconsultas:", height=150)
+        analisis, plan = st.text_area("Análisis General", placeholder="Escriba su análisis clínico aquí...", height=150), st.text_area("Plan 24hs", placeholder="Ej:\n- Cultivar\n- Interconsulta con...", height=150)
 
     st.divider()
     c_gen, c_lim = st.columns(2)
-    btn_generar = c_gen.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary")
+
+    # --- BOTONES ACTUALIZADOS ---
+    btn_generar = c_gen.button("🚀 GENERAR EVOLUCIÓN", use_container_width=True, type="primary")
     if btn_generar: st.session_state['evolucion_generada'] = True
-    if c_lim.button("🧹 LIMPIAR PLANILLA", use_container_width=True, disabled=not st.session_state['evolucion_generada']):
+
+    if c_lim.button("🧹 LIMPIAR PLANILLA", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
@@ -397,27 +398,22 @@ with tab_planes:
         except: pass
 
         pafi_final = pafi_manual
-        if not pafi_final and po2_n and parse_num(fio2):
-            try: pafi_final = str(int(po2_n / (parse_num(fio2)/100)))
+        if not pafi_final and po2_n and fio2:
+            try: pafi_final = str(int(po2_n / (fio2/100)))
             except: pass
         pafi_n = parse_num(pafi_final)
 
-        # --- AUTO-CALCULO TFG (MDRD4 y CKD-EPI) ---
+        # --- AUTO-CALCULOS SCORES ---
         clcr_str = ""
         if cr_n and cr_n > 0:
-            # MDRD-4
             factor_mdrd = 0.742 if sexo_paciente == "Femenino" else 1.0
             mdrd_val = 175 * (cr_n ** -1.154) * (edad_paciente ** -0.203) * factor_mdrd
-
-            # CKD-EPI 2021 (Sin variable de raza)
             kappa = 0.7 if sexo_paciente == "Femenino" else 0.9
             alpha = -0.241 if sexo_paciente == "Femenino" else -0.302
             factor_ckd = 1.012 if sexo_paciente == "Femenino" else 1.0
             ckd_val = 142 * (min(cr_n/kappa, 1) ** alpha) * (max(cr_n/kappa, 1) ** -1.200) * (0.9938 ** edad_paciente) * factor_ckd
+            clcr_str = f" | TFG: {mdrd_val:.1f} (MDRD4) - {ckd_val:.1f} (CKD-EPI) ml/min"
 
-            clcr_str = f" | TFG: {mdrd_val:.1f} (MDRD4) - {ckd_val:.1f} (CKD-EPI) ml/min/1.73m²"
-
-        # --- AUTO-CALCULO SOFA ---
         if (is_sepsis and not sofa) or (not sofa and (pafi_n or cr_n or bt_n or plaq_n)):
             s_pts = 0
             if pafi_n:
@@ -452,120 +448,63 @@ with tab_planes:
                 elif cr_n >= 1.2: s_pts += 1
             sofa = f"{s_pts} (Auto)"
 
-        # --- AUTO-qSOFA ---
         if is_sepsis and not qsofa:
             q_calc = sum([gl_val < 15, fr_n and fr_n >= 22, sys_bp <= 100])
             qsofa = f"{q_calc} (Auto)"
 
-        # --- AUTO-CURB65 ---
         if is_nac and not curb65:
             c_calc = sum([gl_val < 15, urea_n and urea_n >= 42, fr_n and fr_n >= 30, sys_bp < 90 or dia_bp <= 60, edad_paciente >= 65])
             curb65 = f"{c_calc} (Auto)"
 
-        # --- AUTO-MELD ---
         if is_hepato and not meld and bt_n and cr_n and rin_n:
             b, c, r = max(1.0, bt_n), max(1.0, cr_n), max(1.0, rin_n)
             meld_score = 3.78 * math.log(b) + 11.2 * math.log(r) + 9.57 * math.log(c) + 6.43
             meld = f"{round(meld_score)} (Auto)"
 
-        # --- AUTO-CHILD-PUGH ---
         if is_hepato and not child and bt_n and alb_n and rin_n and cp_ascitis and cp_encef:
-            cp_pts = 0
-            if bt_n < 2: cp_pts += 1
-            elif bt_n <= 3: cp_pts += 2
-            else: cp_pts += 3
-            if alb_n > 3.5: cp_pts += 1
-            elif alb_n >= 2.8: cp_pts += 2
-            else: cp_pts += 3
-            if rin_n < 1.7: cp_pts += 1
-            elif rin_n <= 2.2: cp_pts += 2
-            else: cp_pts += 3
-            if cp_ascitis == "Ausente": cp_pts += 1
-            elif cp_ascitis == "Leve/Moderada": cp_pts += 2
-            else: cp_pts += 3
-            if cp_encef == "Ninguna": cp_pts += 1
-            elif cp_encef == "Grado I - II": cp_pts += 2
-            else: cp_pts += 3
-
+            cp_pts = sum([
+                1 if bt_n < 2 else (2 if bt_n <= 3 else 3),
+                1 if alb_n > 3.5 else (2 if alb_n >= 2.8 else 3),
+                1 if rin_n < 1.7 else (2 if rin_n <= 2.2 else 3),
+                1 if cp_ascitis == "Ausente" else (2 if cp_ascitis == "Leve/Moderada" else 3),
+                1 if cp_encef == "Ninguna" else (2 if cp_encef == "Grado I - II" else 3)
+            ])
             cp_clase = "A" if cp_pts <= 6 else ("B" if cp_pts <= 9 else "C")
             child = f"{cp_clase} ({cp_pts} pts) (Auto)"
 
-        # --- TIMI (Auto lectura de UI) ---
         if is_isquemia and not timi and timi_crit is not None:
-            t_pts = len(timi_crit)
-            if edad_paciente >= 65: t_pts += 1
-            timi = f"{t_pts}/7 (Auto)"
+            timi = f"{len(timi_crit) + (1 if edad_paciente >= 65 else 0)}/7 (Auto)"
 
-        # --- RANSON (Auto Ingreso) ---
         if is_pancreas and not ranson:
-            r_pts = 0
-            if edad_paciente > 55: r_pts += 1
-            gb_val = gb_n * 1000 if gb_n and gb_n < 1000 else gb_n
-            if gb_val and gb_val > 16000: r_pts += 1
-            if gluc_n and gluc_n > 200: r_pts += 1
-            if ldh_n and ldh_n > 350: r_pts += 1
-            if got_n and got_n > 250: r_pts += 1
+            r_pts = sum([
+                1 if edad_paciente > 55 else 0,
+                1 if (gb_n * 1000 if gb_n and gb_n < 1000 else gb_n) > 16000 else 0,
+                1 if gluc_n and gluc_n > 200 else 0,
+                1 if ldh_n and ldh_n > 350 else 0,
+                1 if got_n and got_n > 250 else 0
+            ])
             ranson = f"{r_pts} (Auto Ingreso)"
 
-        # --- APACHE II (Parcial Auto) ---
         if is_sepsis and not apache:
             ap_pts = 0
-            # Fisiología
-            if temp_n:
-                if temp_n >= 41 or temp_n <= 29.9: ap_pts += 4
-                elif temp_n >= 39 or temp_n <= 31.9: ap_pts += 3
-                elif temp_n <= 33.9: ap_pts += 2
-                elif temp_n >= 38.5 or temp_n <= 35.9: ap_pts += 1
+            if temp_n: ap_pts += 4 if temp_n >= 41 or temp_n <= 29.9 else (3 if temp_n >= 39 or temp_n <= 31.9 else (2 if temp_n <= 33.9 else (1 if temp_n >= 38.5 or temp_n <= 35.9 else 0)))
             if tam_val and tam_val != "":
                 tv = float(tam_val)
-                if tv >= 160 or tv <= 49: ap_pts += 4
-                elif tv >= 130 or tv <= 69: ap_pts += 2
-                elif tv >= 110: ap_pts += 1
-            if fc_n:
-                if fc_n >= 180 or fc_n <= 39: ap_pts += 4
-                elif fc_n >= 140 or fc_n <= 54: ap_pts += 3
-                elif fc_n >= 110 or fc_n <= 69: ap_pts += 2
-            if fr_n:
-                if fr_n >= 50 or fr_n <= 5: ap_pts += 4
-                elif fr_n >= 35: ap_pts += 3
-                elif fr_n <= 9: ap_pts += 2
-                elif fr_n >= 25 or fr_n <= 11: ap_pts += 1
-            if na_n:
-                if na_n >= 180 or na_n <= 110: ap_pts += 4
-                elif na_n >= 160 or na_n <= 119: ap_pts += 3
-                elif na_n >= 155 or na_n <= 129: ap_pts += 2
-                elif na_n >= 150: ap_pts += 1
-            if k_n:
-                if k_n >= 7.0 or k_n < 2.5: ap_pts += 4
-                elif k_n >= 6.0: ap_pts += 3
-                elif k_n <= 2.9: ap_pts += 2
-                elif k_n >= 5.5 or k_n <= 3.4: ap_pts += 1
+                ap_pts += 4 if tv >= 160 or tv <= 49 else (2 if tv >= 130 or tv <= 69 else (1 if tv >= 110 else 0))
+            if fc_n: ap_pts += 4 if fc_n >= 180 or fc_n <= 39 else (3 if fc_n >= 140 or fc_n <= 54 else (2 if fc_n >= 110 or fc_n <= 69 else 0))
+            if fr_n: ap_pts += 4 if fr_n >= 50 or fr_n <= 5 else (3 if fr_n >= 35 else (2 if fr_n <= 9 else (1 if fr_n >= 25 or fr_n <= 11 else 0)))
+            if na_n: ap_pts += 4 if na_n >= 180 or na_n <= 110 else (3 if na_n >= 160 or na_n <= 119 else (2 if na_n >= 155 or na_n <= 129 else (1 if na_n >= 150 else 0)))
+            if k_n: ap_pts += 4 if k_n >= 7.0 or k_n < 2.5 else (3 if k_n >= 6.0 else (2 if k_n <= 2.9 else (1 if k_n >= 5.5 or k_n <= 3.4 else 0)))
             if cr_n:
-                cr_pts = 0
-                if cr_n >= 3.5: cr_pts = 4
-                elif cr_n >= 2.0: cr_pts = 3
-                elif cr_n >= 1.5: cr_pts = 2
-                elif cr_n < 0.6: cr_pts = 2
+                cr_pts = 4 if cr_n >= 3.5 else (3 if cr_n >= 2.0 else (2 if cr_n >= 1.5 or cr_n < 0.6 else 0))
                 ap_pts += (cr_pts * 2) if kdigo_ira and kdigo_ira != "" else cr_pts
             if gb_val := (gb_n * 1000 if gb_n and gb_n < 1000 else gb_n):
-                if gb_val >= 40000 or gb_val <= 999: ap_pts += 4
-                elif gb_val >= 20000 or gb_val <= 2999: ap_pts += 2
-                elif gb_val >= 15000: ap_pts += 1
-            ap_pts += (15 - gl_val) # GCS
-
-            # Edad
-            if edad_paciente >= 75: ap_pts += 6
-            elif edad_paciente >= 65: ap_pts += 5
-            elif edad_paciente >= 55: ap_pts += 3
-            elif edad_paciente >= 45: ap_pts += 2
-
-            # Crónicos
-            if apache_cro and apache_cro != "Ninguna":
-                ap_pts += 5 if apache_tipo == "Médico / Quirúrgico Urgente" else 2
-
+                ap_pts += 4 if gb_val >= 40000 or gb_val <= 999 else (2 if gb_val >= 20000 or gb_val <= 2999 else (1 if gb_val >= 15000 else 0))
+            ap_pts += (15 - gl_val)
+            ap_pts += 6 if edad_paciente >= 75 else (5 if edad_paciente >= 65 else (3 if edad_paciente >= 55 else (2 if edad_paciente >= 45 else 0)))
+            if apache_cro and apache_cro != "Ninguna": ap_pts += 5 if apache_tipo == "Médico / Quirúrgico Urgente" else 2
             apache = f"{ap_pts} (Auto)"
 
-        # Bloque compilación de Scores para Assessment
         txt_mod = ""
         if is_isquemia and any([killip, grace, timi]): txt_mod += f"\n  • SCA/IAM -> Killip: {killip} | TIMI: {timi} | GRACE: {grace}"
         if is_ic and any([nyha, stevenson, aha_ic]): txt_mod += f"\n  • IC -> NYHA: {nyha} | Stevenson: {stevenson} | AHA: {aha_ic}"
@@ -575,110 +514,130 @@ with tab_planes:
         if is_pancreas and any([bisap, ranson, balthazar]): txt_mod += f"\n  • PANCREATITIS -> BISAP: {bisap} | Ranson: {ranson} | Balthazar: {balthazar}"
         if is_nac and any([curb65, psi]): txt_mod += f"\n  • NAC -> CURB-65: {curb65} | PSI: {psi}"
 
-        str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas']) if st.session_state['infusiones_automatizadas'] else "Sin infusiones activas."
+        # --- CONSTRUCCIÓN INTELIGENTE DE BLOQUES ---
+        str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas']) if st.session_state['infusiones_automatizadas'] else ""
+        inv_list = [f"{k}: {v.strip()}" for k, v in [("CVC", cvc_info), ("Cat.Art", ca_info), ("SV", sv_dias), ("SNG", sng_dias)] if v.strip()]
+        invasiones_str = "Invasiones: " + " | ".join(inv_list) if inv_list else ""
 
-        def construir_linea_lab(items):
-            validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
-            return " | ".join(validos) if validos else ""
+        sv_list = []
+        if ta.strip(): sv_list.append(f"TA: {ta} mmHg")
+        if tam_val != "": sv_list.append(f"TAM: {tam_val} mmHg")
+        if pp_val != "": sv_list.append(f"PP: {pp_val} mmHg")
+        if fc.strip(): sv_list.append(f"FC: {fc} lpm")
+        if fr.strip(): sv_list.append(f"FR: {fr} rpm")
+        if sat.strip(): sv_list.append(f"SatO2: {sat} %")
+        if temp.strip(): sv_list.append(f"T°: {temp} °C")
+        if pvc.strip(): sv_list.append(f"PVC: {pvc} cmH2O")
+        if relleno_cap.strip(): sv_list.append(f"Rell. Capilar: {relleno_cap}")
+        if fio2 and fio2 != 21: sv_list.append(f"FiO2: {fio2} %")
+        signos_vitales = "- SIGNOS VITALES:\n  " + " | ".join(sv_list) if sv_list else ""
 
-        l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
-        gb_str = f"{gb}".strip() if gb.strip() else ""
-        if gb_str:
-            if any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]): gb_str += f" /mm³ (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
-            else: gb_str += " /mm³"
+        neuro_items = [i for i in [neuro_estado, f"Glasgow {glasgow}" if glasgow.strip() else "", f"RASS {rass}" if rass.strip() else "", f"CAM {cam}" if cam.strip() else ""] if i]
+        neuro_str = f"- NEURO: {', '.join(neuro_items)}." if neuro_items else ""
 
-        l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_str, ""), ("Plaq", plaq, "")])
-        l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")])
-        l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")])
-        l_biom = construir_linea_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
-        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_biom] if l]
-        texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
-
-        ecg_items = [("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Onda P", ecg_onda_p, ""), ("Long. P", ecg_long_p, "ms"), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"), ("QRS", ecg_qrs, "ms")]
-        ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
-        if ecg_qt.strip() or ecg_qtc.strip(): ecg_validos.append(f"QT/QTc {ecg_qt.strip() if ecg_qt.strip() else '-'}/{ecg_qtc.strip() if ecg_qtc.strip() else '-'} ms")
-        if ecg_st.strip(): ecg_validos.append(f"ST {ecg_st.strip()}")
-        if ecg_otros.strip(): ecg_validos.append(ecg_otros.strip())
-        ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
-
-        est_list = []
-        if rx_torax.strip(): est_list.append(f"- Rx: {rx_torax.strip()}")
-        if tc.strip(): est_list.append(f"- TC: {tc.strip()}")
-        if eco.strip(): est_list.append(f"- Eco/POCUS: {eco.strip()}")
-        if otros_estudios.strip(): est_list.append(f"- Otros Estudios: {otros_estudios.strip()}")
-        bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join([p for p in [ecg_final, "\n".join(est_list)] if p]) + "\n" if ecg_final or est_list else ""
-
-        cultivos_final = " | ".join([f"{n}: {v.strip()}" for n, v in [("Hemo", cult_hemo), ("Uro", cult_uro), ("Resp", cult_resp), ("Otros", cult_otros)] if v.strip()])
-        infecto_parts = [p for p in [f"Tmax: {tmax.strip()}°C" if tmax.strip() else "", f"ATB: {atb1} / {atb2}".strip(' /') if (atb1 or atb2) else "", cultivos_final] if p]
-        bloque_infectologia = "\n>> INFECTOLOGÍA:\n" + "\n".join([f"- {p}" for p in infecto_parts]) + "\n" if infecto_parts else ""
-
-        signos_vitales = f"""- SIGNOS VITALES:
-  TA: {ta if ta.strip() else '-'} mmHg
-  TAM: {tam_val if tam_val != "" else '-'} mmHg
-  PP: {pp_val if pp_val != "" else '-'} mmHg
-  PR: {fc if fc.strip() else '-'} lpm
-  PVC: {pvc if pvc.strip() else '-'} cmH2O
-  Rell. Capilar: {relleno_cap if relleno_cap.strip() else '-'}
-  FR: {fr if fr.strip() else '-'} rpm
-  SatO2: {sat if sat.strip() else '-'} %
-  FiO2: {fio2 if fio2 else '-'} %
-  T°: {temp if temp.strip() else '-'} °C"""
-
-        if paciente_ventilado:
-            dp_final = dp_manual
-            if not dp_final and pplat and peep:
-                try: dp_final = str(int(parse_num(pplat) - parse_num(peep)))
-                except: pass
-            texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
-  Mecánica: P.Pico {ppico} cmH2O | Comp {comp} | DP {dp_final} | PaFiO2 {pafi_final if pafi_final else '-'}.
-  Examen: {ex_resp}"""
-        else:
-            texto_resp = f"""Dispositivo: {via_aerea} | FiO2 {fio2}%{f" | PaFiO2 {pafi_final}" if pafi_final else ""}.
-  Examen: {ex_resp}"""
+        cv_str = f"- CV: {ex_cv}" if ex_cv.strip() else ""
+        abd_str = f"- ABD: {ex_abd}{f' | Nutrición: {nutricion}' if nutricion else ''}" if ex_abd.strip() or nutricion else ""
 
         balance_txt = ""
-        if ingresos and egresos:
+        if ingresos.strip() and egresos.strip():
             try: balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance 24h: {parse_num(ingresos) - parse_num(egresos):+.0f} ml)"
             except: pass
+        renal_str = f"- RENAL: {ex_renal}{balance_txt}" if ex_renal.strip() or balance_txt else ""
 
-        texto_final = f"""EVOLUCIÓN UTI / UCCO
-Datos Generales: Edad: {edad_paciente} años | Peso Estimado: {peso_paciente} kg | Sexo: {sexo_paciente}
-Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
+        resp_parts = []
+        if paciente_ventilado:
+            m_parts = [i for i in [f"P.Pico {ppico} cmH2O" if ppico.strip() else "", f"Comp {comp}" if comp.strip() else "", f"DP {dp_final}" if dp_final else "", f"PaFiO2 {pafi_final}" if pafi_final else ""] if i]
+            mech_str = " | ".join(m_parts)
 
-(S) SUBJETIVO:
-{subj}
+            r_txt = f"{via_aerea}" if via_aerea.strip() else "ARM"
+            if modo.strip(): r_txt += f", Modo {modo}"
+            if fio2: r_txt += f", FiO2 {fio2}%"
+            if peep: r_txt += f", PEEP {peep} cmH2O"
+            if pplat.strip(): r_txt += f", PPlat {pplat} cmH2O"
+            if vt.strip(): r_txt += f", Vt {vt} ml"
+            resp_parts.append(r_txt + ".")
+            if mech_str: resp_parts.append(f"  Mecánica: {mech_str}.")
+        else:
+            if via_aerea.strip() or pafi_final:
+                r_txt = f"Dispositivo: {via_aerea}" if via_aerea.strip() else "O2"
+                if fio2 and fio2 != 21: r_txt += f" | FiO2 {fio2}%"
+                if pafi_final: r_txt += f" | PaFiO2 {pafi_final}"
+                resp_parts.append(r_txt + ".")
 
-(O) OBJETIVO:
->> INFUSIONES Y DISPOSITIVOS:
-Infusiones Activas: {str_automatizadas}
-Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
+        if ex_resp.strip(): resp_parts.append(f"  Examen: {ex_resp}")
+        texto_resp = "- RESP:\n  " + "\n  ".join(resp_parts) if resp_parts else ""
 
->> EXAMEN FÍSICO Y SIGNOS VITALES:
-{signos_vitales}
+        # Infecto
+        cultivos_list = [f"{n}: {v.strip()}" for n, v in [("Hemo", cult_hemo), ("Uro", cult_uro), ("Resp", cult_resp), ("Otros", cult_otros)] if v.strip()]
+        atbs_activos = [a.strip() for a in [atb1, atb2, atb3, atb4] if a.strip()]
 
-- NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}.
-- CV: {ex_cv}
-- RESP: {texto_resp}
-- ABD: {ex_abd}{f" | Nutrición: {nutricion}" if nutricion else ""}
-- RENAL: {ex_renal}{balance_txt}
-{bloque_infectologia}
->> LABORATORIO Y MEDIO INTERNO:
-{texto_laboratorio}
-{bloque_estudios}
->> FAST HUG BID:
-{"\n".join([f"  ✓ {l}" for l in fast_sel]) if fast_sel else "  Sin marcar."}
+        infecto_parts = []
+        if tmax.strip(): infecto_parts.append(f"Tmax 24h: {tmax.strip()}°C")
+        if atbs_activos: infecto_parts.append("ATB: " + " / ".join(atbs_activos))
+        if cultivos_list: infecto_parts.append("Cultivos: " + " | ".join(cultivos_list))
+        bloque_infectologia = "\n>> INFECTOLOGÍA:\n" + "\n".join([f"- {p}" for p in infecto_parts]) if infecto_parts else ""
 
-(A) ASSESSMENT / ANÁLISIS:
->> DIAGNÓSTICOS ACTIVOS:
-{diagnostico}
->> SCORES DE GRAVEDAD Y PRONÓSTICO:{txt_mod if txt_mod else " No aplica / No calculados."}
+        # Laboratorio
+        def line_lab(items):
+            v = [f"{n} {val} {u}".strip() for n, val, u in items if val.strip()]
+            return " | ".join(v) if v else ""
 
->> ANÁLISIS CLÍNICO:
-{analisis}
+        gb_f = f"{gb}".strip() if gb.strip() else ""
+        if gb_f and any([neut.strip(), linf.strip(), mono.strip(), eos.strip()]):
+            gb_f += f" (N:{neut}% L:{linf}% M:{mono}% E:{eos}%)"
 
-(P) PLAN 24HS:
-{plan}
-"""
+        lab_b = [l for l in [
+            line_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")]),
+            line_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb_f, ""), ("Plaq", plaq, "")]),
+            line_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")]),
+            line_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL"), ("Ca", ca, "mg/dL"), ("P", phos, "mg/dL")]),
+            line_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L"), ("PT", pt, "g/dL"), ("Alb", alb, "g/dL")]),
+            line_lab([("CPK", cpk, "UI/L"), ("CK-MB", cpkmb, "UI/L"), ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("LDH", ldh, "UI/L"), ("PCT", pct, "ng/mL")])
+        ] if l]
+        texto_laboratorio = "\n".join(lab_b) if lab_b else ""
+
+        # Estudios
+        ecg_val = [f"{n} {v}{u}".strip() for n, v, u in [("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Onda P", ecg_onda_p, ""), ("Long. P", ecg_long_p, "ms"), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"), ("QRS", ecg_qrs, "ms")] if v.strip()]
+        if ecg_qt.strip() or ecg_qtc.strip(): ecg_val.append(f"QT/QTc {ecg_qt.strip() if ecg_qt.strip() else '-'}/{ecg_qtc.strip() if ecg_qtc.strip() else '-'} ms")
+        if ecg_st.strip(): ecg_val.append(f"ST {ecg_st.strip()}")
+        if ecg_otros.strip(): ecg_val.append(ecg_otros.strip())
+
+        est_list = [f"- {n}: {v.strip()}" for n, v in [("ECG", " | ".join(ecg_val)), ("Rx", rx_torax), ("TC", tc), ("POCUS", eco), ("Otros Estudios", otros_estudios)] if v.strip() and v.strip() != " | ".join(ecg_val)]
+        if ecg_val: est_list.insert(0, f"- ECG: {' | '.join(ecg_val)}")
+        bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join(est_list) if est_list else ""
+
+        # --- ENSAMBLAJE FINAL DINÁMICO ---
+        tf = [
+            "EVOLUCIÓN UTI / UCCO",
+            f"Datos Generales: Edad: {edad_paciente} años | Peso Estimado: {peso_paciente} kg | Sexo: {sexo_paciente}",
+            f"Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti}" + (f" | Días ARM: {dias_arm.strip()}" if dias_arm.strip() else "")
+        ]
+
+        if subj.strip(): tf.extend(["\n(S) SUBJETIVO:", subj.strip()])
+
+        tf.append("\n(O) OBJETIVO:")
+        if str_automatizadas or invasiones_str:
+            tf.append(">> INFUSIONES Y DISPOSITIVOS:")
+            if str_automatizadas: tf.append(f"Infusiones Activas: {str_automatizadas}")
+            if invasiones_str: tf.append(invasiones_str)
+
+        b_fisico = [p for p in [signos_vitales, neuro_str, cv_str, texto_resp, abd_str, renal_str] if p]
+        if b_fisico:
+            tf.append("\n>> EXAMEN FÍSICO Y SIGNOS VITALES:")
+            tf.extend(b_fisico)
+
+        if bloque_infectologia: tf.append(bloque_infectologia)
+        if texto_laboratorio: tf.extend(["\n>> LABORATORIO Y MEDIO INTERNO:", texto_laboratorio])
+        if bloque_estudios: tf.append(bloque_estudios)
+        if fast_sel: tf.extend(["\n>> FAST HUG BID:", "\n".join([f"  ✓ {l}" for l in fast_sel])])
+
+        tf.append("\n(A) ASSESSMENT / ANÁLISIS:")
+        if diagnostico.strip(): tf.extend([">> DIAGNÓSTICOS ACTIVOS:", diagnostico.strip()])
+        if txt_mod.strip(): tf.extend([">> SCORES DE GRAVEDAD Y PRONÓSTICO:", txt_mod.strip()])
+        if analisis.strip(): tf.extend(["\n>> ANÁLISIS CLÍNICO:", analisis.strip()])
+
+        if plan.strip(): tf.extend(["\n(P) PLAN 24HS:", plan.strip()])
+
+        texto_final = "\n".join(tf)
         st.success("✅ Evolución generada con éxito. Lista para exportar a GECLISA.")
         st.code(texto_final, language="markdown")
