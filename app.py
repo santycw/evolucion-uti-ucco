@@ -23,33 +23,44 @@ def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg,
     if modo == "DOSIS": return (valor_input * conc_final) / (peso_factor * tiempo_factor)
     else: return (valor_input * peso_factor * tiempo_factor) / conc_final
 
-# --- INTEGRACIÓN NCBI E-UTILITIES (MeSH) ---
+# --- INTEGRACIÓN DECS (Descriptores en Ciencias de la Salud - BIREME/OPS) ---
 @st.cache_data(show_spinner=False)
-def obtener_terminos_mesh(query):
-    """Consulta la API de NCBI E-utilities para normalizar diagnósticos con MeSH."""
+def obtener_terminos_decs(query):
+    """Consulta la API pública de DeCS (BIREME) para normalizar diagnósticos en español."""
     try:
-        # 1. Búsqueda en la base de datos MESH
-        url_search = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=mesh&term={query}&retmode=json&retmax=3"
-        res = requests.get(url_search, timeout=4).json()
-        idlist = res.get("esearchresult", {}).get("idlist", [])
+        url = "https://decs.bvsalud.org/api/search"
+        params = {
+            "q": query,
+            "lang": "es"
+        }
+        res = requests.get(url, params=params, timeout=5)
 
-        if not idlist:
-            # Reintento rápido asumiendo términos en inglés/traducidos por el motor de PubMed
-            return []
+        if res.status_code == 200:
+            data = res.json()
+            terminos = []
 
-        # 2. Resumen para obtener el nombre oficial del encabezado
-        ids = ",".join(idlist)
-        url_summary = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=mesh&id={ids}&retmode=json"
-        sum_res = requests.get(url_summary, timeout=4).json()
+            # La API de DeCS puede devolver los datos directamente en una lista o dentro de una clave
+            resultados = data.get("results", data) if isinstance(data, dict) else data
 
-        terminos = []
-        for uid in idlist:
-            nombre = sum_res.get("result", {}).get(uid, {}).get("ds_meshheading", "")
-            if nombre:
-                terminos.append(nombre)
-        return terminos
+            if isinstance(resultados, list):
+                for r in resultados[:3]:  # Tomamos los 3 mejores matches
+                    # Extracción defensiva por posibles cambios en la estructura del JSON de BIREME
+                    nombre = r.get("term", r.get("descriptor", r.get("name", "")))
+                    decs_id = r.get("id", r.get("decsCode", ""))
+
+                    # A veces el nombre viene como diccionario por idiomas
+                    if isinstance(nombre, dict):
+                        nombre = nombre.get("es", str(nombre))
+
+                    if nombre:
+                        etiqueta = f"{nombre} (DeCS: {decs_id})" if decs_id else nombre
+                        terminos.append(etiqueta)
+
+            return terminos if terminos else ["Sin match exacto en la base DeCS (BIREME)."]
+        else:
+            return [f"⚠️ Error del servidor DeCS: Código {res.status_code}"]
     except Exception as e:
-        return []
+        return [f"⚠️ Error de red/conexión: Verifique internet. ({str(e)})"]
 
 # Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
@@ -63,7 +74,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v4.9 | Motor NCBI E-utilities MeSH + Infusiones por Ampolla")
+st.caption("v5.1 | Motor DeCS Integrado (Nativo en Español - BIREME) + Calculadora por Ampolla")
 
 # --- PANEL LATERAL (DATOS GENERALES) ---
 with st.sidebar:
@@ -78,23 +89,26 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos (Activan scores):", placeholder="1. Neumonia\n2. Sepsis...", height=120)
+        diagnostico = st.text_area("Diagnósticos (Activan scores):", placeholder="1. Neumonía\n2. Sepsis...", height=120)
 
-        # --- BOTÓN DE ANÁLISIS MESH ---
-        if st.button("🌐 Analizar Diagnóstico con MeSH (NCBI)", use_container_width=True):
+        st.markdown("<small><i>Integración nativa con BIREME/OPS (Pública, sin API Key)</i></small>", unsafe_allow_html=True)
+
+        # --- BOTÓN DE ANÁLISIS DECS ---
+        if st.button("🌐 Normalizar Diagnóstico (DeCS)", use_container_width=True):
             lineas = [l.strip() for l in diagnostico.split('\n') if l.strip() and len(l) > 2]
             if lineas:
                 st.markdown("---")
-                st.markdown("📝 **Indexación MeSH Oficial:**")
-                with st.spinner("Conectando con servidores del NLM/NCBI..."):
+                st.markdown("📝 **Descriptores en Ciencias de la Salud (DeCS):**")
+                with st.spinner("Consultando servidores de BIREME/OPS..."):
                     for linea in lineas:
                         # Limpiar viñetas y números para la búsqueda
                         q_limpio = re.sub(r'^[\d\.\-\*]+\s*', '', linea).strip()
-                        mesh_terms = obtener_terminos_mesh(q_limpio)
-                        if mesh_terms:
-                            st.success(f"**{q_limpio}** ➔ {', '.join(mesh_terms)}")
+                        decs_terms = obtener_terminos_decs(q_limpio)
+
+                        if decs_terms and "Error" not in decs_terms[0]:
+                            st.success(f"**{q_limpio}** ➔ {', '.join(decs_terms)}")
                         else:
-                            st.warning(f"**{q_limpio}** ➔ Sin match exacto (Intente términos médicos en inglés).")
+                            st.error(f"**{q_limpio}** ➔ {decs_terms[0] if decs_terms else 'Fallo en la búsqueda'}")
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
