@@ -34,7 +34,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v4.7 | Formato SOAP dinámico, Auto-Scores Avanzados y Limpieza Inteligente")
+st.caption("v4.8 | Motor de Infusiones por Ampolla (Vademécum Argentina)")
 
 # --- PANEL LATERAL (DATOS GENERALES) ---
 with st.sidebar:
@@ -198,36 +198,66 @@ with tab_clinca:
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
-        with st.expander("🧮 Calculadora de Infusiones Farmacológicas", expanded=True):
+        with st.expander("🧮 Calculadora de Infusiones (Por Ampolla)", expanded=True):
+            # Diccionario actualizado con presentaciones estándar de Argentina
             dict_calc_drogas = {
-                "Noradrenalina": "mcg/kg/min", "Adrenalina": "mcg/kg/min", "Dobutamina": "mcg/kg/min",
-                "Milrinona": "mcg/kg/min", "Nitroprusiato": "mcg/kg/min", "Nitroglicerina": "mcg/min",
-                "Labetalol": "mg/min", "Fentanilo": "mcg/kg/h", "Remifentanilo": "mcg/kg/h",
-                "Morfina": "mg/h", "Propofol": "mg/kg/h", "Midazolam": "mg/kg/h", "Dexmedetomidina": "mcg/kg/h",
-                "Ketamina": "mg/kg/h", "Atracurio": "mg/kg/h", "Pancuronio": "mg/kg/h", "Vasopresina": "UI/min"
+                "Noradrenalina (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
+                "Adrenalina (1 mg)": {"unidad": "mcg/kg/min", "mg": 1.0},
+                "Vasopresina (20 UI)": {"unidad": "UI/min", "mg": 20.0},
+                "Dopamina (200 mg)": {"unidad": "mcg/kg/min", "mg": 200.0},
+                "Dobutamina (250 mg)": {"unidad": "mcg/kg/min", "mg": 250.0},
+                "Milrinona (10 mg)": {"unidad": "mcg/kg/min", "mg": 10.0},
+                "Levosimendán (12.5 mg)": {"unidad": "mcg/kg/min", "mg": 12.5},
+                "Isoproterenol (1 mg)": {"unidad": "mcg/min", "mg": 1.0},
+                "Nitroprusiato (50 mg)": {"unidad": "mcg/kg/min", "mg": 50.0},
+                "Nitroglicerina (25 mg)": {"unidad": "mcg/min", "mg": 25.0},
+                "Nitroglicerina (50 mg)": {"unidad": "mcg/min", "mg": 50.0},
+                "Labetalol (20 mg)": {"unidad": "mg/min", "mg": 20.0},
+                "Labetalol (100 mg)": {"unidad": "mg/min", "mg": 100.0},
+                "Fentanilo (250 mcg = 0.25 mg)": {"unidad": "mcg/kg/h", "mg": 0.25},
+                "Remifentanilo (2 mg)": {"unidad": "mcg/kg/h", "mg": 2.0},
+                "Remifentanilo (5 mg)": {"unidad": "mcg/kg/h", "mg": 5.0},
+                "Propofol 1% (200 mg)": {"unidad": "mg/kg/h", "mg": 200.0},
+                "Midazolam (15 mg)": {"unidad": "mg/kg/h", "mg": 15.0},
+                "Midazolam (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Dexmedetomidina (200 mcg = 0.2 mg)": {"unidad": "mcg/kg/h", "mg": 0.2},
+                "Morfina (10 mg)": {"unidad": "mg/h", "mg": 10.0},
+                "Atracurio (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Atracurio (25 mg)": {"unidad": "mg/kg/h", "mg": 25.0},
+                "Rocuronio (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Vecuronio (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
+                "Pancuronio (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0}
             }
-            droga_sel = st.selectbox("Fármaco:", list(dict_calc_drogas.keys()))
-            unidad_activa = dict_calc_drogas[droga_sel]
+
+            droga_sel = st.selectbox("Fármaco y Presentación:", list(dict_calc_drogas.keys()))
+            unidad_activa = dict_calc_drogas[droga_sel]["unidad"]
+            mg_base = dict_calc_drogas[droga_sel]["mg"]
+
             c_calc1, c_calc2 = st.columns(2)
-            droga_mg = c_calc1.number_input("Droga (mg/UI)", min_value=0.0)
-            volumen_ml = c_calc2.number_input("Volumen (ml)", min_value=0.0)
+            cant_ampollas = c_calc1.number_input("Cant. Ampollas/Frascos en la dilución", min_value=0.0, value=1.0, step=0.5)
+            volumen_ml = c_calc2.number_input("Volumen Total de la Dilución (ml)", min_value=0.0, value=100.0, step=10.0)
+
+            droga_mg_total = cant_ampollas * mg_base
+            st.caption(f"💡 Dosis total calculada en la solución: **{droga_mg_total} mg (o UI)**")
+
             calc_modo = st.radio("Cálculo:", [f"Dosis ({unidad_activa})", "Velocidad (ml/h)"], horizontal=True)
+            nombre_limpio = droga_sel.split(" (")[0] # Extrae solo el nombre, ej: "Noradrenalina"
 
             if "Dosis" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0)
-                if droga_mg > 0 and volumen_ml > 0:
-                    res = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
+                if droga_mg_total > 0 and volumen_ml > 0:
+                    res = calcular_infusion_universal("DOSIS", droga_mg_total, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"Resultado: {res:.4f} {unidad_activa}")
-                    if st.button(f"➕ Anexar {droga_sel}", type="secondary"):
-                        st.session_state['infusiones_automatizadas'].append(f"{droga_sel}: {res:.4f} {unidad_activa}")
+                    if st.button(f"➕ Anexar {nombre_limpio}", type="secondary"):
+                        st.session_state['infusiones_automatizadas'].append(f"{nombre_limpio}: {res:.4f} {unidad_activa}")
                         st.rerun()
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, format="%.4f")
-                if droga_mg > 0 and volumen_ml > 0:
-                    res = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
+                if droga_mg_total > 0 and volumen_ml > 0:
+                    res = calcular_infusion_universal("VELOCIDAD", droga_mg_total, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"Bomba: {res:.2f} ml/h")
-                    if st.button(f"➕ Anexar {droga_sel}", type="secondary"):
-                        st.session_state['infusiones_automatizadas'].append(f"{droga_sel}: {dosis_obj:.4f} {unidad_activa}")
+                    if st.button(f"➕ Anexar {nombre_limpio}", type="secondary"):
+                        st.session_state['infusiones_automatizadas'].append(f"{nombre_limpio}: {dosis_obj:.4f} {unidad_activa}")
                         st.rerun()
 
             if st.session_state['infusiones_automatizadas']:
@@ -293,7 +323,6 @@ with tab_clinca:
         st.subheader("5. Infectología")
         tmax = st.text_input("Temp. Máxima 24h (°C)")
 
-        # 4 Campos para ATBs
         at1, at2, at3, at4 = st.columns(4)
         atb1 = at1.text_input("ATB 1 y Día")
         atb2 = at2.text_input("ATB 2 y Día")
@@ -313,7 +342,7 @@ with tab_lab:
     with st.container(border=True):
         st.subheader("🩸 Hemograma y Coagulación")
         l1, l2, l3, l4 = st.columns(4)
-        hb, hto, gb, plaq = l1.text_input("Hb (g/dL)"), l2.text_input("Hto (%)"), l3.text_input("GB (/mm³)"), l4.text_input("Plaquetas")
+        hb, hto, gb, plaq = l1.text_input("Hb (g/dL)"), l2.text_input("Hto (%)"), l3.text_input("GB (/mm³ o mil)"), l4.text_input("Plaquetas")
         f1, f2, f3, f4 = st.columns(4)
         neut, linf, mono, eos = f1.text_input("Neut %"), f2.text_input("Linf %"), f3.text_input("Mono %"), f4.text_input("Eos %")
         c1, c2, c3 = st.columns(3)
@@ -370,7 +399,6 @@ with tab_planes:
     st.divider()
     c_gen, c_lim = st.columns(2)
 
-    # --- BOTONES ACTUALIZADOS ---
     btn_generar = c_gen.button("🚀 GENERAR EVOLUCIÓN", use_container_width=True, type="primary")
     if btn_generar: st.session_state['evolucion_generada'] = True
 
