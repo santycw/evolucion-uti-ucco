@@ -4,6 +4,7 @@ import json
 import os
 import datetime
 import math
+import requests
 
 # --- INICIALIZACIÓN DE ESTADOS DE SESIÓN ---
 if 'evolucion_generada' not in st.session_state:
@@ -22,6 +23,34 @@ def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg,
     if modo == "DOSIS": return (valor_input * conc_final) / (peso_factor * tiempo_factor)
     else: return (valor_input * peso_factor * tiempo_factor) / conc_final
 
+# --- INTEGRACIÓN NCBI E-UTILITIES (MeSH) ---
+@st.cache_data(show_spinner=False)
+def obtener_terminos_mesh(query):
+    """Consulta la API de NCBI E-utilities para normalizar diagnósticos con MeSH."""
+    try:
+        # 1. Búsqueda en la base de datos MESH
+        url_search = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=mesh&term={query}&retmode=json&retmax=3"
+        res = requests.get(url_search, timeout=4).json()
+        idlist = res.get("esearchresult", {}).get("idlist", [])
+
+        if not idlist:
+            # Reintento rápido asumiendo términos en inglés/traducidos por el motor de PubMed
+            return []
+
+        # 2. Resumen para obtener el nombre oficial del encabezado
+        ids = ",".join(idlist)
+        url_summary = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=mesh&id={ids}&retmode=json"
+        sum_res = requests.get(url_summary, timeout=4).json()
+
+        terminos = []
+        for uid in idlist:
+            nombre = sum_res.get("result", {}).get(uid, {}).get("ds_meshheading", "")
+            if nombre:
+                terminos.append(nombre)
+        return terminos
+    except Exception as e:
+        return []
+
 # Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
@@ -34,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v4.8 | Motor de Infusiones por Ampolla (Vademécum Argentina)")
+st.caption("v4.9 | Motor NCBI E-utilities MeSH + Infusiones por Ampolla")
 
 # --- PANEL LATERAL (DATOS GENERALES) ---
 with st.sidebar:
@@ -49,14 +78,30 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos (Activan scores):", placeholder="1. Neumonía\n2. Sepsis...", height=120)
+        diagnostico = st.text_area("Diagnósticos (Activan scores):", placeholder="1. Neumonia\n2. Sepsis...", height=120)
+
+        # --- BOTÓN DE ANÁLISIS MESH ---
+        if st.button("🌐 Analizar Diagnóstico con MeSH (NCBI)", use_container_width=True):
+            lineas = [l.strip() for l in diagnostico.split('\n') if l.strip() and len(l) > 2]
+            if lineas:
+                st.markdown("---")
+                st.markdown("📝 **Indexación MeSH Oficial:**")
+                with st.spinner("Conectando con servidores del NLM/NCBI..."):
+                    for linea in lineas:
+                        # Limpiar viñetas y números para la búsqueda
+                        q_limpio = re.sub(r'^[\d\.\-\*]+\s*', '', linea).strip()
+                        mesh_terms = obtener_terminos_mesh(q_limpio)
+                        if mesh_terms:
+                            st.success(f"**{q_limpio}** ➔ {', '.join(mesh_terms)}")
+                        else:
+                            st.warning(f"**{q_limpio}** ➔ Sin match exacto (Intente términos médicos en inglés).")
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
 dias_int_uti = (hoy - fecha_uti).days
 paciente_ventilado = bool(dias_arm.strip().lower() and dias_arm.strip().lower() not in ["0", "-", "no"])
 
-# --- CONEXIÓN A BASE DE DATOS LOCAL ---
+# --- CONEXIÓN A BASE DE DATOS LOCAL (Fallback offline para scores) ---
 @st.cache_data
 def cargar_diccionario_medico():
     return {
@@ -199,7 +244,6 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
         with st.expander("🧮 Calculadora de Infusiones (Por Ampolla)", expanded=True):
-            # Diccionario actualizado con presentaciones estándar de Argentina
             dict_calc_drogas = {
                 "Noradrenalina (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
                 "Adrenalina (1 mg)": {"unidad": "mcg/kg/min", "mg": 1.0},
@@ -241,7 +285,7 @@ with tab_clinca:
             st.caption(f"💡 Dosis total calculada en la solución: **{droga_mg_total} mg (o UI)**")
 
             calc_modo = st.radio("Cálculo:", [f"Dosis ({unidad_activa})", "Velocidad (ml/h)"], horizontal=True)
-            nombre_limpio = droga_sel.split(" (")[0] # Extrae solo el nombre, ej: "Noradrenalina"
+            nombre_limpio = droga_sel.split(" (")[0]
 
             if "Dosis" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0)
