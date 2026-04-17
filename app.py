@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("v3.4 | Automatización Total: Supresión de campos manuales de infusión")
+st.caption("Versión Actual | Motor Offline | Cálculo por Ampollas (Argentina) | ECG Extendido")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -245,38 +245,46 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES (FUENTE EXCLUSIVA DE DROGAS) ---
-        with st.expander("🧮 Calculadora de Infusiones Farmacológicas (Fuente GECLISA)", expanded=True):
+        # --- CALCULADORA DE INFUSIONES POR AMPOLLA (ARGENTINA) ---
+        with st.expander("🧮 Calculadora de Infusiones Farmacológicas (Por Ampollas)", expanded=True):
             st.info(f"💡 El peso configurado del paciente para los cálculos dependientes de masa es: **{peso_paciente} kg**.")
 
             dict_calc_drogas = {
-                "Noradrenalina": "mcg/kg/min",
-                "Adrenalina": "mcg/kg/min",
-                "Dobutamina": "mcg/kg/min",
-                "Milrinona": "mcg/kg/min", # Incorporada de la lista manual anterior
-                "Fentanilo": "mcg/kg/h",
-                "Remifentanilo": "mcg/kg/h",
-                "Morfina": "mg/h",
-                "Propofol": "mg/kg/h",
-                "Midazolam": "mg/kg/h",
-                "Dexmedetomidina": "mcg/kg/h",
-                "Ketamina": "mg/kg/h",
-                "Atracurio": "mg/kg/h",
-                "Pancuronio": "mg/kg/h",
-                "Vasopresina": "UI/min"
+                "Noradrenalina (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
+                "Adrenalina (1 mg)": {"unidad": "mcg/kg/min", "mg": 1.0},
+                "Dopamina (200 mg)": {"unidad": "mcg/kg/min", "mg": 200.0},
+                "Dobutamina (250 mg)": {"unidad": "mcg/kg/min", "mg": 250.0},
+                "Milrinona (10 mg)": {"unidad": "mcg/kg/min", "mg": 10.0},
+                "Vasopresina (20 UI)": {"unidad": "UI/min", "mg": 20.0},
+                "Fentanilo (0.25 mg)": {"unidad": "mcg/kg/h", "mg": 0.25},
+                "Remifentanilo (2 mg)": {"unidad": "mcg/kg/h", "mg": 2.0},
+                "Remifentanilo (5 mg)": {"unidad": "mcg/kg/h", "mg": 5.0},
+                "Morfina (10 mg)": {"unidad": "mg/h", "mg": 10.0},
+                "Propofol 1% (200 mg)": {"unidad": "mg/kg/h", "mg": 200.0},
+                "Midazolam (15 mg)": {"unidad": "mg/kg/h", "mg": 15.0},
+                "Midazolam (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Dexmedetomidina (0.2 mg)": {"unidad": "mcg/kg/h", "mg": 0.2},
+                "Ketamina (500 mg)": {"unidad": "mg/kg/h", "mg": 500.0},
+                "Atracurio (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Pancuronio (4 mg)": {"unidad": "mg/kg/h", "mg": 4.0}
             }
 
-            droga_sel = st.selectbox("Seleccione el fármaco a inyectar en la evolución:", list(dict_calc_drogas.keys()))
-            unidad_activa = dict_calc_drogas[droga_sel]
+            droga_sel = st.selectbox("Seleccione el fármaco y presentación:", list(dict_calc_drogas.keys()))
+            unidad_activa = dict_calc_drogas[droga_sel]["unidad"]
+            mg_base = dict_calc_drogas[droga_sel]["mg"]
 
-            st.caption(f"Unidad estándar para **{droga_sel}**: `{unidad_activa}`")
+            st.caption(f"Unidad estándar para **{droga_sel.split(' (')[0]}**: `{unidad_activa}`")
 
             c_calc1, c_calc2 = st.columns(2)
-            lbl_droga = "Cantidad total (mg)" if "UI" not in unidad_activa else "Cantidad total (UI)"
-            droga_mg = c_calc1.number_input(lbl_droga, min_value=0.0, value=0.0, step=1.0)
-            volumen_ml = c_calc2.number_input("Volumen de Dilución (ml)", min_value=0.0, value=0.0, step=10.0)
+            cant_ampollas = c_calc1.number_input("Cantidad de Ampollas/Frascos", min_value=0.0, value=1.0, step=0.5)
+            volumen_ml = c_calc2.number_input("Volumen Total de Dilución (ml)", min_value=0.0, value=100.0, step=10.0)
+
+            droga_mg = cant_ampollas * mg_base
+            st.caption(f"💡 Dosis total calculada en la solución: **{droga_mg} {'UI' if 'UI' in unidad_activa else 'mg'}**")
 
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
+
+            nombre_limpio = droga_sel.split(" (")[0]
 
             if "DOSIS" in calc_modo:
                 vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
@@ -284,8 +292,8 @@ with tab_clinca:
                     dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
 
-                    if st.button(f"➕ Anexar {droga_sel} a la Evolución", type="secondary"):
-                        item = f"{droga_sel}: {dosis_calc:.4f} {unidad_activa}"
+                    if st.button(f"➕ Anexar {nombre_limpio} a la Evolución", type="secondary"):
+                        item = f"{nombre_limpio}: {dosis_calc:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
                             st.rerun()
@@ -296,8 +304,8 @@ with tab_clinca:
                     vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
 
-                    if st.button(f"➕ Anexar {droga_sel} a la Evolución", type="secondary"):
-                        item = f"{droga_sel}: {dosis_obj:.4f} {unidad_activa}"
+                    if st.button(f"➕ Anexar {nombre_limpio} a la Evolución", type="secondary"):
+                        item = f"{nombre_limpio}: {dosis_obj:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
                             st.rerun()
@@ -392,9 +400,15 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("5. Infectología")
         tmax = st.text_input("Temp. Máxima 24h (°C)")
-        i_1, i_2 = st.columns(2)
-        atb1 = i_1.text_input("ATB 1 y Día")
-        atb2 = i_2.text_input("ATB 2 y Día")
+
+        st.caption("Esquema Antibiótico (Completar según necesidad)")
+        atb_col1, atb_col2, atb_col3, atb_col4 = st.columns(4)
+        atb1 = atb_col1.text_input("ATB 1 y Día")
+        atb2 = atb_col2.text_input("ATB 2 y Día")
+        atb3 = atb_col3.text_input("ATB 3 y Día")
+        atb4 = atb_col4.text_input("ATB 4 y Día")
+
+        st.caption("Cultivos")
         c_1, c_2 = st.columns(2)
         cult_hemo = c_1.text_input("Hemocultivos")
         cult_uro = c_2.text_input("Urocultivo")
@@ -477,17 +491,19 @@ with tab_estudios:
     st.info("💡 Solo se imprimirán los estudios que completes.")
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
-        e_col1, e_col2, e_col3, e_col4 = st.columns(4)
+        e_col0, e_col1, e_col2, e_col3 = st.columns(4)
+        ecg_fc = e_col0.text_input("FC (lpm)")
         ecg_ritmo = e_col1.text_input("Ritmo")
         ecg_eje = e_col2.text_input("Eje (°)")
         ecg_pr = e_col3.text_input("PR (ms)")
+
+        e_col4, e_col5, e_col6, e_col7 = st.columns(4)
         ecg_qrs_ms = e_col4.text_input("QRS (ms)")
-
-        e_col5, e_col6, e_col7 = st.columns(3)
         ecg_qtc = e_col5.text_input("QTc (ms)")
-        ecg_st = e_col6.text_input("Segmento ST")
-        ecg_onda_t = e_col7.text_input("Onda T")
+        ecg_onda_p = e_col6.text_input("Long. Onda P (ms)")
+        ecg_st = e_col7.text_input("Segmento ST")
 
+        ecg_onda_t = st.text_input("Onda T")
         ecg_otros = st.text_input("Otros hallazgos (Bloqueos, Ondas Q, etc.)")
 
     with st.container(border=True):
@@ -521,7 +537,7 @@ with tab_planes:
     # --- BOTONES DE CONTROL GENERAL ---
     col_gen, col_limp = st.columns(2)
 
-    btn_generar = col_gen.button("🚀 GENERAR HISTORIA CLÍNICA (GECLISA)", use_container_width=True, type="primary")
+    btn_generar = col_gen.button("🚀 Generar Evolución", use_container_width=True, type="primary")
 
     if btn_generar:
         st.session_state['evolucion_generada'] = True
@@ -565,8 +581,8 @@ with tab_planes:
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta en el día de la fecha."
 
         # --- RUTINA LIMPIEZA ECG Y ESTUDIOS ---
-        ecg_items = [("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
-                     ("QRS", ecg_qrs_ms, "ms"), ("QTc", ecg_qtc, "ms"), ("ST", ecg_st, ""), ("Onda T", ecg_onda_t, "")]
+        ecg_items = [("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
+                     ("QRS", ecg_qrs_ms, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, ""), ("Onda T", ecg_onda_t, "")]
         ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
         if ecg_otros.strip(): ecg_validos.append(ecg_otros.strip())
 
@@ -594,7 +610,9 @@ with tab_planes:
         cultivos_final = " | ".join(lista_cultivos)
 
         tmax_str = f"Tmax: {tmax.strip()}°C" if tmax.strip() else ""
-        atb_str = f"ATB: {atb1} / {atb2}".strip(' /') if (atb1 or atb2) else ""
+
+        atbs_ingresados = [atb for atb in [atb1, atb2, atb3, atb4] if atb.strip()]
+        atb_str = f"ATB: {' / '.join(atbs_ingresados)}" if atbs_ingresados else ""
 
         infecto_parts = [p for p in [tmax_str, atb_str, cultivos_final] if p]
         bloque_infectologia = ""
