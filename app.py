@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Borrado Absoluto")
+st.caption("Versión Actual | Auto-Cálculo de Scores (Corregido) | Cálculo por Ampollas | Borrado Absoluto")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -153,7 +153,7 @@ is_tvp = detectar_en_db("tvp", diag_norm)
 is_hda = detectar_en_db("hda", diag_norm)
 is_cid = detectar_en_db("cid", diag_norm)
 
-# --- SCORES MÉDICOS MANUALES (Opcionales, el sistema calculará lo que pueda automáticamente) ---
+# --- SCORES MÉDICOS MANUALES (Opcionales) ---
 if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
     st.markdown("### ⚙️ Ajustes Manuales de Scores")
     st.caption("Complete solo si desea sobrescribir el cálculo automático.")
@@ -523,11 +523,21 @@ if cr_n:
     elif cr_n >= 2.0: s_pts += 2
     elif cr_n >= 1.2: s_pts += 1
 
-# Calculo qSOFA
-q_calc = sum([gl_val < 15, fr_n and fr_n >= 22, sys_bp and sys_bp <= 100])
+# Calculo qSOFA CORREGIDO (Evitando TypeErrors por campos nulos)
+q_calc = sum([
+    gl_val < 15,
+    fr_n is not None and fr_n >= 22,
+    sys_bp is not None and sys_bp <= 100
+])
 
-# Calculo CURB-65
-c_calc = sum([gl_val < 15, urea_n and urea_n >= 42, fr_n and fr_n >= 30, (sys_bp and sys_bp < 90) or (dia_bp and dia_bp <= 60), edad_n >= 65])
+# Calculo CURB-65 CORREGIDO
+c_calc = sum([
+    gl_val < 15,
+    urea_n is not None and urea_n >= 42,
+    fr_n is not None and fr_n >= 30,
+    (sys_bp is not None and sys_bp < 90) or (dia_bp is not None and dia_bp <= 60),
+    edad_n >= 65
+])
 
 # Calculo TFG
 tfg_str = ""
@@ -554,7 +564,6 @@ with tab_planes:
     with st.container(border=True):
         st.subheader("(A) Problemas Activos")
 
-        # Generador dinámico de listado de scores
         auto_scores_list = []
         if is_sepsis:
             val_s = sofa if sofa.strip() else f"{s_pts} (Auto)"
