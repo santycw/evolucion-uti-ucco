@@ -736,5 +736,5 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 (P) PLAN:
 {plan}
 """
-        st.success("✅ Evolución generada con éxito. Lista para exportar a GECLISA.")
+        st.success("✅ Evolución generada con éxito lista para exportar a Historia Clínica.")
         st.code(texto_final, language="markdown")
