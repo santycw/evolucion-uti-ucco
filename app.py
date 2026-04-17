@@ -492,7 +492,9 @@ with tab_estudios:
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
         e_col0, e_col1, e_col2, e_col3 = st.columns(4)
-        ecg_fc = e_col0.text_input("FC (lpm)")
+
+        # EL CORAZÓN DEL PROBLEMA RESUELTO AQUÍ: (Añadido key='ecg_fc_input')
+        ecg_fc = e_col0.text_input("FC (lpm)", key="ecg_fc_input")
         ecg_ritmo = e_col1.text_input("Ritmo")
         ecg_eje = e_col2.text_input("Eje (°)")
         ecg_pr = e_col3.text_input("PR (ms)")
@@ -636,7 +638,7 @@ with tab_planes:
   TA: {ta if ta.strip() else '-'} mmHg
   TAM: {tam_str} mmHg
   PP: {pp_str} mmHg
-  PR: {fc if fc.strip() else '-'} lpm
+  FC: {fc if fc.strip() else '-'} lpm
   PVC: {pvc if pvc.strip() else '-'} cmH2O
   Rell. Capilar: {relleno_cap if relleno_cap.strip() else '-'}
   FR: {fr if fr.strip() else '-'} rpm
