@@ -4,7 +4,6 @@ import json
 import os
 import datetime
 import math
-import requests
 
 # --- INICIALIZACIÓN DE ESTADOS DE SESIÓN ---
 if 'evolucion_generada' not in st.session_state:
@@ -23,39 +22,6 @@ def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg,
     if modo == "DOSIS": return (valor_input * conc_final) / (peso_factor * tiempo_factor)
     else: return (valor_input * peso_factor * tiempo_factor) / conc_final
 
-# --- INTEGRACIÓN DECS (BIREME/OPS - Nativo en Español) ---
-@st.cache_data(show_spinner=False)
-def obtener_terminos_decs(query):
-    """Consulta la API pública de DeCS (BIREME) para normalizar diagnósticos en español."""
-    try:
-        url = "https://decs.bvsalud.org/api/search"
-        params = {"q": query, "lang": "es"}
-        # Timeout reducido a 3 segundos para falla rápida en entornos sin red
-        res = requests.get(url, params=params, timeout=3)
-
-        if res.status_code == 200:
-            data = res.json()
-            terminos = []
-            resultados = data.get("results", data) if isinstance(data, dict) else data
-
-            if isinstance(resultados, list):
-                for r in resultados[:3]:
-                    nombre = r.get("term", r.get("descriptor", r.get("name", "")))
-                    decs_id = r.get("id", r.get("decsCode", ""))
-                    if isinstance(nombre, dict): nombre = nombre.get("es", str(nombre))
-                    if nombre:
-                        etiqueta = f"{nombre} (DeCS: {decs_id})" if decs_id else nombre
-                        terminos.append(etiqueta)
-            return terminos if terminos else ["Búsqueda finalizada: Sin equivalencia exacta en DeCS."]
-        return [f"⚠️ Servidor DeCS no disponible (HTTP {res.status_code})."]
-
-    except requests.exceptions.ConnectionError:
-        return ["⚠️ Sin conexión a red externa. Normalización DeCS deshabilitada temporalmente."]
-    except requests.exceptions.Timeout:
-        return ["⚠️ Tiempo de espera agotado al contactar con BIREME."]
-    except Exception as e:
-        return ["⚠️ Error interno en el módulo de indexación diagnóstica."]
-
 # Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide")
 
@@ -67,7 +33,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Normalización DeCS (Resiliente a Red) | Cálculo por Ampolla | Omisión de Vacíos")
+st.caption("Versión Actual | Motor Offline (Tesauro Local) | Cálculo por Ampolla | Omisión de Vacíos")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -82,21 +48,139 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos:", placeholder="Ej: Neumonía, Shock séptico...", height=100)
-        if st.button("🌐 Normalizar con DeCS", use_container_width=True):
-            lineas = [l.strip() for l in diagnostico.split('\n') if l.strip()]
-            for l in lineas:
-                q = re.sub(r'^[\d\.\-\*]+\s*', '', l).strip()
-                terms = obtener_terminos_decs(q)
-                if "⚠️" in terms[0]:
-                    st.warning(f"**{q}** ➔ {terms[0]}")
-                else:
-                    st.info(f"**{q}** ➔ {', '.join(terms)}")
+        diagnostico = st.text_area("Diagnósticos (Activan scores predictivos):", placeholder="Ej: Neumonía, Shock séptico...", height=100)
+        st.caption("El motor interno interpretará automáticamente el texto para habilitar escalas clínicas relevantes.")
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
 dias_int_uti = (hoy - fecha_uti).days
 paciente_ventilado = bool(dias_arm.strip() and dias_arm.strip() not in ["0", "-", "no"])
+
+# --- CONEXIÓN A TESAURO LOCAL ---
+@st.cache_data
+def cargar_diccionario_medico():
+    return {
+        "isquemia": ["sca", "scacest", "scacst", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario"],
+        "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "cor pulmonale"],
+        "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
+        "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia"],
+        "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"],
+        "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "encefalopatia"],
+        "pancreas": ["pancreatitis", "pa", "necrosis pancreatica"],
+        "acv": ["acv", "ictus", "stroke", "isquemico", "hemorragico", "ait", "tia"],
+        "hsa": ["hsa", "hemorragia subaracnoidea", "aneurisma"],
+        "nac": ["nac", "neumonia", "pulmonia", "bronconeumonia", "nih"],
+        "epoc": ["epoc", "bronquitis cronica", "enfisema", "aeepoc"],
+        "tep": ["tep", "tromboembolismo", "embolia pulmonar"],
+        "tvp": ["tvp", "trombosis venosa", "trombosis profunda"],
+        "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis"],
+        "cid": ["cid", "coagulacion intravascular diseminada"]
+    }
+
+db_terminologia = cargar_diccionario_medico()
+diag_norm = diagnostico.lower()
+
+def detectar_en_db(categoria, texto):
+    patron = r'\b(?:' + '|'.join(re.escape(kw) for kw in db_terminologia.get(categoria, [])) + r')\b'
+    return bool(re.search(patron, texto))
+
+is_isquemia = detectar_en_db("isquemia", diag_norm)
+is_ic = detectar_en_db("ic", diag_norm)
+is_fa = detectar_en_db("fa", diag_norm)
+is_sepsis = detectar_en_db("sepsis", diag_norm)
+is_renal = detectar_en_db("renal", diag_norm)
+is_hepato = detectar_en_db("hepato", diag_norm)
+is_pancreas = detectar_en_db("pancreas", diag_norm)
+is_acv = detectar_en_db("acv", diag_norm)
+is_hsa = detectar_en_db("hsa", diag_norm)
+is_nac = detectar_en_db("nac", diag_norm)
+is_epoc = detectar_en_db("epoc", diag_norm)
+is_tep = detectar_en_db("tep", diag_norm)
+is_tvp = detectar_en_db("tvp", diag_norm)
+is_hda = detectar_en_db("hda", diag_norm)
+is_cid = detectar_en_db("cid", diag_norm)
+
+# --- INICIALIZACIÓN DE VARIABLES SCORE ---
+sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = cha2ds2 = hasbled = ""
+kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
+nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
+timi_crit = apache_cro = cp_ascitis = cp_encef = None
+
+# --- SCORES MÉDICOS INTERACTIVOS ---
+if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
+    st.markdown("### ⚙️ Scores Clínicos Sugeridos")
+    if is_isquemia:
+        with st.expander("🫀 Síndrome Coronario Agudo (SCA) / IAM", expanded=True):
+            killip = st.selectbox("Killip y Kimball", ["", "I (Sin IC)", "II (R3/Estertores)", "III (EAP)", "IV (Shock)"])
+            timi_crit = st.multiselect("Criterios para Score TIMI:", ["AAS en últimos 7 días", "≥ 3 FR Cardiovasculares", "Enf. Coronaria conocida (Est. > 50%)", "Angina Severa (≥ 2 epi en 24h)", "Desviación ST ≥ 0.5mm", "Marcadores Cardíacos Positivos"])
+            grace = st.text_input("GRACE (% Mort)")
+    if is_ic:
+        with st.expander("🫀 Insuficiencia Cardíaca", expanded=True):
+            ic1, ic2, ic3 = st.columns(3)
+            nyha = ic1.selectbox("Clase NYHA", ["", "I", "II", "III", "IV"])
+            stevenson = ic2.selectbox("Perfil Stevenson", ["", "A (Seco-Cal)", "B (Húm-Cal)", "C (Húm-Frío)", "L (Seco-Frío)"])
+            aha_ic = ic3.selectbox("Estadio AHA", ["", "A", "B", "C", "D"])
+    if is_fa:
+        with st.expander("💓 Fibrilación Auricular", expanded=True):
+            fa1, fa2 = st.columns(2)
+            cha2ds2 = fa1.text_input("CHA2DS2-VASc")
+            hasbled = fa2.text_input("HAS-BLED")
+    if is_sepsis:
+        with st.expander("🦠 Sepsis y Estado Crítico", expanded=True):
+            apache_cro = st.selectbox("APACHE II - Salud Crónica", ["Ninguna", "Inmunosupresión", "Cirrosis/Falla Hepática", "Falla CV severa (NYHA IV)", "EPOC Severo", "Diálisis crónica"])
+            apache_tipo = st.radio("Ingreso:", ["Médico / Quirúrgico Urgente", "Quirúrgico Electivo"], horizontal=True)
+            s1, s2 = st.columns(2)
+            qsofa = s1.text_input("qSOFA")
+            sofa = s2.text_input("SOFA")
+    if is_renal:
+        with st.expander("🩸 Nefrología", expanded=True):
+            ren1, ren2 = st.columns(2)
+            kdigo_ira = ren1.selectbox("KDIGO (IRA)", ["", "1", "2", "3"])
+            kdigo_erc = ren2.selectbox("Estadio ERC", ["", "G1", "G2", "G3a", "G3b", "G4", "G5"])
+    if is_hepato:
+        with st.expander("🟡 Hepatopatía", expanded=True):
+            hp1, hp2 = st.columns(2)
+            cp_ascitis = hp1.selectbox("Grado Ascitis", ["Ausente", "Leve/Moderada", "Tensión/Refractaria"])
+            cp_encef = hp2.selectbox("Grado Encefalopatía", ["Ninguna", "Grado I - II", "Grado III - IV"])
+    if is_pancreas:
+        with st.expander("⚕️ Pancreatitis Aguda", expanded=True):
+            p1, p2 = st.columns(2)
+            bisap = p1.text_input("BISAP")
+            balthazar = p2.selectbox("Balthazar (TC)", ["", "A", "B", "C", "D", "E"])
+    if is_acv:
+        with st.expander("🧠 ACV Isquémico", expanded=True):
+            a1, a2 = st.columns(2)
+            nihss = a1.text_input("NIHSS")
+            mrs = a2.selectbox("Rankin (mRS)", ["", "0", "1", "2", "3", "4", "5", "6"])
+    if is_hsa:
+        with st.expander("🧠 Hemorragia Subaracnoidea", expanded=True):
+            hsa1, hsa2 = st.columns(2)
+            hunt = hsa1.selectbox("Hunt & Hess", ["", "I", "II", "III", "IV", "V"])
+            fisher = hsa2.selectbox("Escala Fisher (TC)", ["", "I", "II", "III", "IV"])
+    if is_nac:
+        with st.expander("🫁 Neumonía (NAC)", expanded=True):
+            n1, n2 = st.columns(2)
+            curb65 = n1.text_input("CURB-65")
+            psi = n2.text_input("PSI / PORT")
+    if is_epoc:
+        with st.expander("🫁 EPOC", expanded=True):
+            gold = st.selectbox("Clasificación GOLD", ["", "A", "B", "E"])
+    if is_tep or is_tvp:
+        with st.expander("🩸 Tromboembolismo", expanded=True):
+            t1, t2, t3 = st.columns(3)
+            wells_tep = t1.text_input("Wells (TEP)")
+            pesi = t2.text_input("PESI / sPESI")
+            wells_tvp = t3.text_input("Wells (TVP)")
+    if is_hda:
+        with st.expander("🩸 Hemorragia Digestiva", expanded=True):
+            hd1, hd2 = st.columns(2)
+            blatchford = hd1.text_input("Glasgow-Blatchford")
+            rockall = hd2.text_input("Score Rockall")
+    if is_cid:
+        with st.expander("🩸 CID", expanded=True):
+            isth = st.selectbox("Score ISTH", ["", "Compatible (≥5 pts)", "No sugerente (<5 pts)"])
+
+st.divider()
 
 # --- PESTAÑAS PRINCIPALES ---
 tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs(["🩺 Clínica", "🧪 Laboratorio", "🩻 ECG/Imagen", "📋 Plan"])
@@ -104,7 +188,7 @@ tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs(["🩺 Clínica", "🧪 
 with tab_clinca:
     with st.container(border=True):
         st.subheader("Subjetivo e Infusiones")
-        subj = st.text_area("Novedades (S):", placeholder="Paciente estable...", height=68)
+        subj = st.text_area("Novedades (S):", placeholder="Paciente refiere...", height=68)
 
         with st.expander("🧮 Calculadora por Ampolla (Argentina)", expanded=False):
             dict_calc = {
