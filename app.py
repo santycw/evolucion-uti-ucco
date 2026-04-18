@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Auto-Cálculo de Scores (Corregido) | Cálculo por Ampollas | Borrado Absoluto")
+st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Borrado Absoluto")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -90,7 +90,7 @@ d_arm_limpio = dias_arm.strip().lower()
 paciente_ventilado = bool(d_arm_limpio and d_arm_limpio not in ["0", "-", "no"])
 
 # --- INICIALIZACIÓN DE SCORES MANUALES ---
-sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = cha2ds2 = hasbled = ""
+sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = cha2ds2 = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
 
@@ -101,7 +101,7 @@ def cargar_diccionario_medico():
     fallback_db = {
         "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario"],
         "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "cor pulmonale"],
-        "fa": ["fa", "faarv", "famrv", "fabrv", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
+        "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
         "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia"],
         "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"],
         "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "encefalopatia"],
@@ -172,9 +172,7 @@ if is_ic:
         aha_ic = ic3.selectbox("Estadio AHA", ["", "A", "B", "C", "D"])
 if is_fa:
     with st.expander("💓 Fibrilación Auricular", expanded=False):
-        fa1, fa2 = st.columns(2)
-        cha2ds2 = fa1.text_input("CHA2DS2-VASc")
-        hasbled = fa2.text_input("HAS-BLED")
+        cha2ds2 = st.text_input("CHA2DS2-VASc")
 if is_sepsis:
     with st.expander("🦠 Sepsis", expanded=False):
         s1, s2, s3 = st.columns(3)
@@ -449,6 +447,8 @@ with tab_estudios:
         ecg_onda_p = e_col6.text_input("Long. Onda P (ms)")
         ecg_st = e_col7.text_input("Segmento ST")
 
+        ecg_conclusiones = st.text_area("Conclusiones ECG", height=68)
+
     with st.container(border=True):
         st.subheader("🩻 Imágenes y Procedimientos")
         rx_torax = st.text_area("Rx Tórax / Radiografías", height=68)
@@ -631,6 +631,8 @@ with tab_planes:
         ecg_items = [("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
                      ("QRS", ecg_qrs_ms, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, "")]
         ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
+        if ecg_conclusiones.strip():
+            ecg_validos.append(f"Conclusión: {ecg_conclusiones.strip()}")
         ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
 
         est_list = []
@@ -736,5 +738,5 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 (P) PLAN:
 {plan}
 """
-        st.success("✅ Evolución generada con éxito lista para exportar a Historia Clínica.")
+        st.success("✅ Evolución generada con éxito, lista para exportar a Historia Clínica.")
         st.code(texto_final, language="markdown")
