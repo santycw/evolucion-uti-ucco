@@ -92,11 +92,11 @@ albumina = 0.0
 meld_dialisis = False
 bisap_derrame = False
 
-# Scores manuales (Sobreescrituras) e inicialización de lógicos
+# Scores manuales e inicialización de lógicos
 sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
-chf = hta = diabetes = stroke_fa = vascular = False # Vars FA
+chf = hta = diabetes = stroke_fa = vascular = False 
 
 @st.cache_data
 def cargar_diccionario_medico():
@@ -116,18 +116,25 @@ def cargar_diccionario_medico():
         "tvp": ["tvp", "trombosis venosa", "trombosis profunda"],
         "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis"],
         "cid": ["cid", "coagulacion intravascular diseminada"],
-        "fa": ["fa", "fibrilacion", "fibrilación auricular", "af", "auricular fibrillation", "faarv", "famrv", "fabrv", "f.a.", "f.a"]
+        "fa": ["fa", "fibrilacion", "fibrilacion auricular", "af", "auricular fibrillation"]
     }
     if os.path.exists(ruta_db):
         try:
             with open(ruta_db, "r", encoding="utf-8") as archivo:
-                return json.load(archivo)
+                data = json.load(archivo)
+                # EL ARREGLO ESTÁ AQUÍ: Forzamos que las palabras nuevas se sumen al archivo viejo
+                for k, v in fallback_db.items():
+                    if k not in data:
+                        data[k] = v
+                return data
         except: return fallback_db
     else: return fallback_db
 
 db_terminologia = cargar_diccionario_medico()
 
+# EL SEGUNDO ARREGLO ESTÁ AQUÍ: Limpiamos signos de puntuación que rompen la búsqueda
 diag_norm = diagnostico.lower()
+diag_norm = diag_norm.replace('.', '').replace(',', ' ') 
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
 diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
 diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
@@ -221,7 +228,7 @@ if is_nac:
         curb65 = n1.text_input("CURB-65 manual")
         psi = n2.text_input("PSI / PORT manual")
 if is_fa:
-    with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VA | ESC 2024)", expanded=False):
+    with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VA | ESC 2024)", expanded=True):
         st.info("💡 **Nota:** La edad se lee de forma automática del panel lateral. Según Guías ESC 2024, se omite la categoría de sexo.")
         fa1, fa2 = st.columns(2)
         chf = fa1.checkbox("Insuf. Cardíaca / Disfunción VI (C - 1 pt)")
