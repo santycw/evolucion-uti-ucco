@@ -3,6 +3,7 @@ import re
 import json
 import os
 import datetime
+import math
 
 # --- INICIALIZACIÓN DE ESTADOS DE SESIÓN ---
 if 'evolucion_generada' not in st.session_state:
@@ -14,20 +15,15 @@ if 'infusiones_automatizadas' not in st.session_state:
 def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg, valor_input, unidad_objetivo):
     if volumen_ml == 0 or cantidad_droga_mg_ui == 0:
         return 0.0
-
     conc_base = cantidad_droga_mg_ui / volumen_ml
-
     if "mcg" in unidad_objetivo or "gammas" in unidad_objetivo:
         conc_final = conc_base * 1000
     else:
         conc_final = conc_base
-
     usa_peso = "kg" in unidad_objetivo
     peso_factor = peso_kg if usa_peso else 1.0
-
     usa_min = "min" in unidad_objetivo
     tiempo_factor = 60.0 if usa_min else 1.0
-
     if modo == "DOSIS":
         dosis = (valor_input * conc_final) / (peso_factor * tiempo_factor)
         return dosis
@@ -35,10 +31,10 @@ def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg,
         velocidad = (valor_input * peso_factor * tiempo_factor) / conc_final
         return velocidad
 
-# Configuración de página con layout extendido
+# Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PERSONALIZADO (Diseño Oscuro y Moderno) ---
+# --- CSS PERSONALIZADO ---
 st.markdown("""
     <style>
     .stTextArea textarea, .stTextInput input, .stNumberInput input {
@@ -63,7 +59,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Índice PAR en UI")
+st.caption("Estructura Completa Garantizada | Lab y ECG Extendidos | Auto-Scores")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -80,28 +76,34 @@ with st.sidebar:
     with st.container(border=True):
         diagnostico = st.text_area("Diagnósticos (Activan scores):", "1. \n2. ", height=120)
 
-# --- CÁLCULO DINÁMICO DE DÍAS ---
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
 dias_int_uti = (hoy - fecha_uti).days
 
-# --- VARIABLE CONDICIONAL: PACIENTE VENTILADO ---
 d_arm_limpio = dias_arm.strip().lower()
 paciente_ventilado = bool(d_arm_limpio and d_arm_limpio not in ["0", "-", "no"])
 
-# --- INICIALIZACIÓN DE SCORES MANUALES ---
+# --- INICIALIZACIÓN DE VARIABLES PARA DATOS FALTANTES ---
+apache_cronico = 0
+apache_ira = False
+child_encef = "Ausente"
+child_ascitis = "Ausente"
+albumina = 0.0
+meld_dialisis = False
+bisap_derrame = False
+
+# Scores manuales (Sobreescrituras)
 sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
 
-# --- CONEXIÓN A BASE DE DATOS LOCAL ---
 @st.cache_data
 def cargar_diccionario_medico():
     ruta_db = "diccionario.json"
     fallback_db = {
         "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario"],
         "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "cor pulmonale"],
-        "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia"],
+        "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia", "vasoplegia", "falla multiorganica"],
         "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"],
         "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "encefalopatia"],
         "pancreas": ["pancreatitis", "pa", "necrosis pancreatica"],
@@ -145,23 +147,18 @@ is_pancreas = detectar_en_db("pancreas", diag_norm)
 is_acv = detectar_en_db("acv", diag_norm)
 is_hsa = detectar_en_db("hsa", diag_norm)
 is_nac = detectar_en_db("nac", diag_norm)
-is_epoc = detectar_en_db("epoc", diag_norm)
-is_tep = detectar_en_db("tep", diag_norm)
-is_tvp = detectar_en_db("tvp", diag_norm)
-is_hda = detectar_en_db("hda", diag_norm)
-is_cid = detectar_en_db("cid", diag_norm)
 
-# --- SCORES MÉDICOS MANUALES (Opcionales) ---
-if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
-    st.markdown("### ⚙️ Ajustes Manuales de Scores")
-    st.caption("Complete solo si desea sobrescribir el cálculo automático.")
+# --- RECOLECCIÓN DE DATOS FALTANTES PARA SCORES ---
+if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac]):
+    st.markdown("### ⚙️ Complemento de Scores")
+    st.caption("Complete los datos faltantes para lograr un cálculo automático preciso, o ingrese el score manualmente para sobreescribir.")
 
 if is_isquemia:
     with st.expander("🫀 Síndrome Coronario Agudo (SCA) / IAM", expanded=False):
         c1, c2, c3 = st.columns(3)
         killip = c1.selectbox("Killip y Kimball", ["", "I (Sin IC)", "II (R3/Estertores)", "III (EAP)", "IV (Shock)"])
-        grace = c2.text_input("GRACE (% Mort)")
-        timi = c3.text_input("TIMI (0-7)")
+        grace = c2.text_input("GRACE Manual")
+        timi = c3.text_input("TIMI Manual")
 if is_ic:
     with st.expander("🫀 Insuficiencia Cardíaca", expanded=False):
         ic1, ic2, ic3 = st.columns(3)
@@ -169,26 +166,41 @@ if is_ic:
         stevenson = ic2.selectbox("Perfil Stevenson", ["", "A (Seco-Cal)", "B (Húm-Cal)", "C (Húm-Frío)", "L (Seco-Frío)"])
         aha_ic = ic3.selectbox("Estadio AHA", ["", "A", "B", "C", "D"])
 if is_sepsis:
-    with st.expander("🦠 Sepsis", expanded=False):
+    with st.expander("🦠 Sepsis (APACHE II / SOFA)", expanded=False):
+        st.info("Datos faltantes para cálculo automático de APACHE II:")
+        col_a1, col_a2 = st.columns(2)
+        apache_cronico = col_a1.selectbox("Puntaje Enfermedad Crónica", [0, 2, 5], format_func=lambda x: f"{x} pts (0=No, 2=Electiva, 5=NoQx/Urgencia)")
+        apache_ira = col_a2.checkbox("Falla Renal Aguda (Duplica pts de Creatinina)")
+        st.divider()
         s1, s2, s3 = st.columns(3)
         qsofa = s1.text_input("qSOFA manual")
         sofa = s2.text_input("SOFA manual")
-        apache = s3.text_input("APACHE II")
+        apache = s3.text_input("APACHE II manual")
 if is_renal:
     with st.expander("🩸 Nefrología", expanded=False):
         ren1, ren2 = st.columns(2)
         kdigo_ira = ren1.selectbox("KDIGO (IRA)", ["", "1", "2", "3"])
         kdigo_erc = ren2.selectbox("Estadio ERC", ["", "G1", "G2", "G3a", "G3b", "G4", "G5"])
 if is_hepato:
-    with st.expander("🟡 Hepatopatía", expanded=False):
+    with st.expander("🟡 Hepatopatía (Child-Pugh / MELD)", expanded=False):
+        st.info("Datos faltantes para cálculo automático de MELD / Child-Pugh:")
+        hp_c1, hp_c2, hp_c3 = st.columns(3)
+        child_encef = hp_c1.selectbox("Encefalopatía", ["Ausente", "Grado I-II", "Grado III-IV"])
+        child_ascitis = hp_c2.selectbox("Ascitis", ["Ausente", "Leve/Moderada", "Severa/Refractaria"])
+        albumina = hp_c3.number_input("Albúmina (g/dL) para Score", min_value=0.0, value=0.0, step=0.1)
+        meld_dialisis = st.checkbox("Paciente en Diálisis (Calcula Cr como 4.0 para MELD)")
+        st.divider()
         hp1, hp2 = st.columns(2)
-        child = hp1.selectbox("Child-Pugh", ["", "A", "B", "C"])
-        meld = hp2.text_input("MELD")
+        child = hp1.selectbox("Child-Pugh Manual", ["", "A", "B", "C"])
+        meld = hp2.text_input("MELD Manual")
 if is_pancreas:
     with st.expander("⚕️ Pancreatitis Aguda", expanded=False):
+        st.info("Datos faltantes para cálculo de BISAP:")
+        bisap_derrame = st.checkbox("Presencia de Derrame Pleural")
+        st.divider()
         p1, p2, p3 = st.columns(3)
-        bisap = p1.text_input("BISAP")
-        ranson = p2.text_input("Ranson")
+        bisap = p1.text_input("BISAP Manual")
+        ranson = p2.text_input("Ranson Manual")
         balthazar = p3.selectbox("Balthazar (TC)", ["", "A", "B", "C", "D", "E"])
 if is_acv:
     with st.expander("🧠 ACV Isquémico", expanded=False):
@@ -204,7 +216,7 @@ if is_nac:
     with st.expander("🫁 Neumonía (NAC)", expanded=False):
         n1, n2 = st.columns(2)
         curb65 = n1.text_input("CURB-65 manual")
-        psi = n2.text_input("PSI / PORT")
+        psi = n2.text_input("PSI / PORT manual")
 
 st.divider()
 
@@ -223,7 +235,6 @@ with tab_clinca:
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
-
         with st.expander("🧮 Calculadora de Infusiones Farmacológicas (Por Ampollas)", expanded=False):
             dict_calc_drogas = {
                 "Noradrenalina (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
@@ -250,19 +261,19 @@ with tab_clinca:
             mg_base = dict_calc_drogas[droga_sel]["mg"]
 
             c_calc1, c_calc2 = st.columns(2)
-            cant_ampollas = c_calc1.number_input("Cantidad de Ampollas/Frascos", min_value=0.0, value=1.0, step=0.5)
-            volumen_ml = c_calc2.number_input("Volumen Total de Dilución (ml)", min_value=0.0, value=100.0, step=10.0)
+            cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5)
+            volumen_ml = c_calc2.number_input("Volumen Dilución (ml)", min_value=0.0, value=100.0, step=10.0)
 
             droga_mg = cant_ampollas * mg_base
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True)
             nombre_limpio = droga_sel.split(" (")[0]
 
             if "DOSIS" in calc_modo:
-                vel_mlh = st.number_input("Velocidad actual en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
+                vel_mlh = st.number_input("Velocidad en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0)
                 if droga_mg > 0 and volumen_ml > 0:
                     dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
-                    if st.button(f"➕ Anexar {nombre_limpio} a la Evolución", type="secondary"):
+                    if st.button(f"➕ Anexar {nombre_limpio}", type="secondary"):
                         item = f"{nombre_limpio}: {dosis_calc:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
@@ -272,17 +283,11 @@ with tab_clinca:
                 if droga_mg > 0 and volumen_ml > 0:
                     vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
-                    if st.button(f"➕ Anexar {nombre_limpio} a la Evolución", type="secondary"):
-                        item = f"{nombre_limpio}: {dosis_obj:.4f} {unidad_activa}"
-                        if item not in st.session_state['infusiones_automatizadas']:
-                            st.session_state['infusiones_automatizadas'].append(item)
-                            st.rerun()
 
             if st.session_state['infusiones_automatizadas']:
-                st.markdown("---")
-                st.caption("📋 **Infusiones activas en memoria:**")
+                st.caption("📋 **En memoria:**")
                 for inf in st.session_state['infusiones_automatizadas']: st.markdown(f"- `{inf}`")
-                if st.button("🗑️ Borrar memoria de infusiones"):
+                if st.button("🗑️ Borrar memoria"):
                     st.session_state['infusiones_automatizadas'] = []
                     st.rerun()
 
@@ -324,9 +329,7 @@ with tab_clinca:
                     pvc_f = float(pvc.replace(',', '.'))
                     par_calc = (fc_f * pvc_f) / t_mean
                     par_ui_str = f"{par_calc:.2f}"
-        except:
-            pass
-
+        except: pass
         v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM")
 
         ex_cv = st.text_area("Ex. Cardiovascular", "Sin livideces. R1/R2 normofonéticos.")
@@ -344,17 +347,15 @@ with tab_clinca:
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
         if paciente_ventilado:
-            st.info("⚙️ Consola de Mecánica Respiratoria Activa")
             r1, r2, r3, r4 = st.columns(4)
             modo = r1.text_input("Modo", "VCV")
             peep = r2.number_input("PEEP (cmH2O)", 0, 30, 5)
             vt = r3.text_input("Vt (ml)")
-            dp_manual = r4.text_input("Driving P. (cmH2O)")
-
+            dp_manual = r4.text_input("Driving P.")
             r5, r6, r7 = st.columns(3)
             ppico = r5.text_input("P.Pico (cmH2O)")
             pplat = r6.text_input("P.Plateau (cmH2O)")
-            comp = r7.text_input("Comp. (ml/cmH2O)")
+            comp = r7.text_input("Comp.")
 
         ex_resp = st.text_input("Examen Respiratorio", "Buena entrada de aire bilateral.")
 
@@ -371,6 +372,7 @@ with tab_clinca:
         ingresos = bh1.text_input("Ingresos Totales (ml)")
         egresos = bh2.text_input("Egresos Totales (ml)")
 
+    # --- INFECTOLOGÍA COMPLETA RESTAURADA ---
     with st.container(border=True):
         st.subheader("5. Infectología")
         tmax = st.text_input("Temp. Máxima 24h (°C)")
@@ -390,8 +392,9 @@ with tab_clinca:
         cult_resp = c_3.text_input("Respiratorios (BAL/Mini-BAL)")
         cult_otros = c_4.text_input("Otros (LCR, Catéter, Piel/PB)")
 
+# --- LABORATORIO EXTENDIDO ---
 with tab_lab:
-    st.info("💡 Solo se imprimirán los valores que se completen explícitamente.")
+    st.info("💡 Solo se imprimirán en la evolución los valores que completes explícitamente.")
     with st.container(border=True):
         st.subheader("🌬️ EAB (Estado Ácido-Base)")
         e1, e2, e3, e4, e5, e6, e7 = st.columns(7)
@@ -421,11 +424,16 @@ with tab_lab:
         q1, q2, q3, q4, q5, q6 = st.columns(6)
         urea = q1.text_input("Urea (mg/dL)")
         cr = q2.text_input("Cr (mg/dL)")
-        na = q3.text_input("Na (mEq/L)")
-        potasio = q4.text_input("K (mEq/L)")
-        cl = q5.text_input("Cl (mEq/L)")
-        mg = q6.text_input("Mg (mg/dL)")
-        gluc = st.text_input("Glucemia (mg/dL)")
+        gluc = q3.text_input("Glucemia (mg/dL)")
+        na = q4.text_input("Na (mEq/L)")
+        potasio = q5.text_input("K (mEq/L)")
+        cl = q6.text_input("Cl (mEq/L)")
+
+        qe1, qe2, qe3, qe4 = st.columns(4)
+        mg = qe1.text_input("Mg (mg/dL)")
+        ca_tot = qe2.text_input("Calcemia (mg/dL)")
+        ca_io = qe3.text_input("Ca++ Iónico (mmol/L)")
+        fosforo = qe4.text_input("Fosfatemia (mg/dL)")
 
     with st.container(border=True):
         st.subheader("🟡 Hepatograma, Proteínas y Biomarcadores")
@@ -437,26 +445,50 @@ with tab_lab:
         fal = he5.text_input("FAL (UI/L)")
         ggt = he6.text_input("GGT (UI/L)")
 
-        b1, b2, b3, b4 = st.columns(4)
-        cpk = b1.text_input("CPK (UI/L)")
-        tropo = b2.text_input("Tropo I (ng/mL)")
-        bnp = b3.text_input("proBNP (pg/mL)")
-        pct = b4.text_input("PCT (ng/mL)")
+        # --- NUEVA FILA: PROTEÍNAS E INFLAMACIÓN ---
+        pi1, pi2, pi3, pi4 = st.columns(4)
+        prot_tot = pi1.text_input("Prot. Totales (g/dL)")
+        albumina_lab = pi2.text_input("Albúmina (g/dL)")
+        vsg = pi3.text_input("VSG (mm/h)")
+        pcr = pi4.text_input("PCR (mg/L)")
+
+        # --- FILA EXISTENTE DE BIOMARCADORES ---
+        b1, b2, b3, b4, b5, b6 = st.columns(6)
+        ldh = b1.text_input("LDH (UI/L)")
+        cpk = b2.text_input("CPK (UI/L)")
+        cpk_mb = b3.text_input("CPK-MB (UI/L)")
+        tropo = b4.text_input("Tropo I (ng/mL)")
+        bnp = b5.text_input("proBNP (pg/mL)")
+        pct = b6.text_input("PCT (ng/mL)")
 
 with tab_estudios:
     with st.container(border=True):
         st.subheader("📊 Electrocardiograma (ECG)")
         e_col0, e_col1, e_col2, e_col3 = st.columns(4)
-        ecg_fc = e_col0.text_input("FC (lpm)", key="ecg_fc_input")
+        ecg_fc = e_col0.text_input("FC (lpm)", key="ecg_fc_input", help="Se usa para calcular QTc")
         ecg_ritmo = e_col1.text_input("Ritmo")
         ecg_eje = e_col2.text_input("Eje (°)")
         ecg_pr = e_col3.text_input("PR (ms)")
 
-        e_col4, e_col5, e_col6, e_col7 = st.columns(4)
+        e_col4, e_col5, e_col6, e_col7, e_col8 = st.columns(5)
         ecg_qrs_ms = e_col4.text_input("QRS (ms)")
-        ecg_qtc = e_col5.text_input("QTc (ms)")
-        ecg_onda_p = e_col6.text_input("Long. Onda P (ms)")
-        ecg_st = e_col7.text_input("Segmento ST")
+        ecg_qt = e_col5.text_input("QT (ms)")
+
+        # --- CÁLCULO DE QTc BAZETT EN TIEMPO REAL ---
+        qtc_ui_str = ""
+        try:
+            if ecg_fc.strip() and ecg_qt.strip():
+                fc_val = float(ecg_fc.replace(',', '.'))
+                qt_val = float(ecg_qt.replace(',', '.'))
+                if fc_val > 0:
+                    rr_sec = 60.0 / fc_val
+                    qtc_val = qt_val / math.sqrt(rr_sec)
+                    qtc_ui_str = f"{qtc_val:.0f}"
+        except: pass
+
+        ecg_qtc = e_col6.text_input("QTc Auto (ms)", value=qtc_ui_str, disabled=True, help="Bazett: QT / √RR")
+        ecg_onda_p = e_col7.text_input("Onda P (ms)")
+        ecg_st = e_col8.text_input("Segmento ST")
 
         ecg_conclusiones = st.text_area("Conclusiones ECG", height=68)
 
@@ -471,7 +503,6 @@ def p_num(val):
     try: return float(str(val).replace(',', '.').strip())
     except: return None
 
-# Pre-procesamiento de variables vitales
 sys_bp, dia_bp, tam_val, pp_val = None, None, "", ""
 if ta and "/" in ta:
     try:
@@ -502,8 +533,16 @@ fc_n = p_num(fc)
 pvc_n = p_num(pvc)
 urea_n = p_num(urea)
 edad_n = int(edad_paciente)
+temp_n = p_num(temp)
+ph_f = p_num(ph)
+pco2_f = p_num(pco2)
+na_f = p_num(na)
+k_f = p_num(potasio)
+hto_f = p_num(hto)
+gb_f = p_num(gb)
+rin_n = p_num(rin)
 
-# Calculo SOFA
+# --- CÁLCULO SOFA ---
 s_pts = 0
 if pafi_val:
     if pafi_val < 100 and paciente_ventilado: s_pts += 4
@@ -536,23 +575,155 @@ if cr_n:
     elif cr_n >= 2.0: s_pts += 2
     elif cr_n >= 1.2: s_pts += 1
 
-# Calculo qSOFA
-q_calc = sum([
-    gl_val < 15,
-    fr_n is not None and fr_n >= 22,
-    sys_bp is not None and sys_bp <= 100
-])
+# --- CÁLCULO qSOFA & CURB-65 ---
+q_calc = sum([gl_val < 15, fr_n is not None and fr_n >= 22, sys_bp is not None and sys_bp <= 100])
+c_calc = sum([gl_val < 15, urea_n is not None and urea_n >= 42, fr_n is not None and fr_n >= 30, (sys_bp is not None and sys_bp < 90) or (dia_bp is not None and dia_bp <= 60), edad_n >= 65])
 
-# Calculo CURB-65
-c_calc = sum([
-    gl_val < 15,
-    urea_n is not None and urea_n >= 42,
-    fr_n is not None and fr_n >= 30,
-    (sys_bp is not None and sys_bp < 90) or (dia_bp is not None and dia_bp <= 60),
-    edad_n >= 65
-])
+# --- CÁLCULO APACHE II AUTOMÁTICO ---
+apache_auto_pts = 0
+faltan_datos_apache = False
 
-# Calculo TFG
+if edad_n >= 75: apache_auto_pts += 6
+elif edad_n >= 65: apache_auto_pts += 5
+elif edad_n >= 55: apache_auto_pts += 3
+elif edad_n >= 45: apache_auto_pts += 2
+
+if temp_n is not None:
+    if temp_n >= 41 or temp_n <= 29.9: apache_auto_pts += 4
+    elif temp_n >= 39 or 30 <= temp_n <= 31.9: apache_auto_pts += 3
+    elif 32 <= temp_n <= 33.9: apache_auto_pts += 2
+    elif 38.5 <= temp_n <= 38.9 or 34 <= temp_n <= 35.9: apache_auto_pts += 1
+else: faltan_datos_apache = True
+
+if tam_val:
+    if tam_val >= 160 or tam_val <= 49: apache_auto_pts += 4
+    elif 130 <= tam_val <= 159: apache_auto_pts += 3
+    elif 110 <= tam_val <= 129 or 50 <= tam_val <= 69: apache_auto_pts += 2
+else: faltan_datos_apache = True
+
+if fc_n is not None:
+    if fc_n >= 180 or fc_n <= 39: apache_auto_pts += 4
+    elif 140 <= fc_n <= 179 or 40 <= fc_n <= 54: apache_auto_pts += 3
+    elif 110 <= fc_n <= 139 or 55 <= fc_n <= 69: apache_auto_pts += 2
+else: faltan_datos_apache = True
+
+if fr_n is not None:
+    if fr_n >= 50 or fr_n <= 5: apache_auto_pts += 4
+    elif 35 <= fr_n <= 49: apache_auto_pts += 3
+    elif 6 <= fr_n <= 9: apache_auto_pts += 2
+    elif 25 <= fr_n <= 34 or 10 <= fr_n <= 11: apache_auto_pts += 1
+else: faltan_datos_apache = True
+
+if fio2 and po2_n:
+    if fio2 >= 50 and pco2_f:
+        fio2_dec = fio2 / 100.0
+        AaDO2 = (fio2_dec * 713) - (pco2_f / 0.8) - po2_n
+        if AaDO2 >= 500: apache_auto_pts += 4
+        elif AaDO2 >= 350: apache_auto_pts += 3
+        elif AaDO2 >= 200: apache_auto_pts += 2
+    elif fio2 < 50:
+        if po2_n < 55: apache_auto_pts += 4
+        elif po2_n <= 60: apache_auto_pts += 3
+        elif po2_n <= 70: apache_auto_pts += 1
+else: faltan_datos_apache = True
+
+if ph_f:
+    if ph_f >= 7.7 or ph_f < 7.15: apache_auto_pts += 4
+    elif 7.6 <= ph_f <= 7.69 or 7.15 <= ph_f <= 7.24: apache_auto_pts += 3
+    elif 7.25 <= ph_f <= 7.32: apache_auto_pts += 2
+    elif 7.5 <= ph_f <= 7.59: apache_auto_pts += 1
+
+if na_f:
+    if na_f >= 180 or na_f <= 110: apache_auto_pts += 4
+    elif 160 <= na_f <= 179 or 111 <= na_f <= 119: apache_auto_pts += 3
+    elif 155 <= na_f <= 159 or 120 <= na_f <= 129: apache_auto_pts += 2
+    elif 150 <= na_f <= 154: apache_auto_pts += 1
+
+if k_f:
+    if k_f >= 7 or k_f <= 2.4: apache_auto_pts += 4
+    elif 6 <= k_f <= 6.9: apache_auto_pts += 3
+    elif 2.5 <= k_f <= 2.9: apache_auto_pts += 2
+    elif 5.5 <= k_f <= 5.9 or 3 <= k_f <= 3.4: apache_auto_pts += 1
+
+if cr_n:
+    cr_pts = 0
+    if cr_n >= 3.6: cr_pts = 4
+    elif 1.5 <= cr_n <= 3.49: cr_pts = 2
+    elif cr_n < 0.6: cr_pts = 2
+    if apache_ira: cr_pts *= 2
+    apache_auto_pts += cr_pts
+
+if hto_f:
+    if hto_f >= 60 or hto_f < 20: apache_auto_pts += 4
+    elif 50 <= hto_f <= 59.9 or 20 <= hto_f <= 29.9: apache_auto_pts += 2
+    elif 46 <= hto_f <= 49.9: apache_auto_pts += 1
+
+if gb_f:
+    gb_val = gb_f / 1000 if gb_f > 100 else gb_f
+    if gb_val >= 40 or gb_val < 1: apache_auto_pts += 4
+    elif 20 <= gb_val <= 39.9 or 1 <= gb_val <= 2.9: apache_auto_pts += 2
+    elif 15 <= gb_val <= 19.9: apache_auto_pts += 1
+
+if gl_val: apache_auto_pts += (15 - gl_val)
+if apache_cronico: apache_auto_pts += apache_cronico
+
+apache_final_str = f"{apache_auto_pts} (Auto)" if not faltan_datos_apache else "Faltan gases/vitales"
+
+# --- CÁLCULO MELD & CHILD-PUGH ---
+meld_auto_str = "Faltan datos (Cr, BT, INR, Na)"
+if cr_n and bt_n and rin_n:
+    cr_meld = max(1.0, cr_n)
+    bt_meld = max(1.0, bt_n)
+    inr_meld = max(1.0, rin_n)
+    if meld_dialisis: cr_meld = 4.0
+    meld_score = 3.78 * math.log(bt_meld) + 11.2 * math.log(inr_meld) + 9.57 * math.log(cr_meld) + 6.43
+    meld_score = round(meld_score)
+    if na_f and 125 <= na_f <= 137:
+        meld_na = meld_score + 1.32*(137-na_f) - (0.033*meld_score*(137-na_f))
+        meld_auto_str = f"{round(meld_na)} (MELD-Na Auto)"
+    else:
+        meld_auto_str = f"{meld_score} (Auto)"
+
+child_auto_str = "Faltan datos"
+if bt_n and rin_n and albumina > 0:
+    pts_child = 0
+    if bt_n < 2: pts_child += 1
+    elif bt_n <= 3: pts_child += 2
+    else: pts_child += 3
+    if rin_n < 1.7: pts_child += 1
+    elif rin_n <= 2.2: pts_child += 2
+    else: pts_child += 3
+    if albumina > 3.5: pts_child += 1
+    elif albumina >= 2.8: pts_child += 2
+    else: pts_child += 3
+    if "I-II" in child_encef: pts_child += 2
+    elif "III-IV" in child_encef: pts_child += 3
+    else: pts_child += 1
+    if "Leve" in child_ascitis: pts_child += 2
+    elif "Severa" in child_ascitis: pts_child += 3
+    else: pts_child += 1
+    clase = "A" if pts_child <= 6 else "B" if pts_child <= 9 else "C"
+    child_auto_str = f"{pts_child} pts - Clase {clase} (Auto)"
+
+# --- CÁLCULO BISAP ---
+bisap_auto_str = "Faltan datos"
+if urea_n is not None:
+    bisap_pts = 0
+    if urea_n > 53.5: bisap_pts += 1 # BUN > 25
+    if gl_val < 15: bisap_pts += 1
+    if edad_n > 60: bisap_pts += 1
+    if bisap_derrame: bisap_pts += 1
+    sirs_pts = 0
+    if temp_n and (temp_n < 36 or temp_n > 38): sirs_pts += 1
+    if fc_n and fc_n > 90: sirs_pts += 1
+    if fr_n and (fr_n > 20 or (pco2_f and pco2_f < 32)): sirs_pts += 1
+    if gb_f:
+        g_val = gb_f / 1000 if gb_f > 100 else gb_f
+        if g_val < 4 or g_val > 12: sirs_pts += 1
+    if sirs_pts >= 2: bisap_pts += 1
+    bisap_auto_str = f"{bisap_pts}/5 (Auto)"
+
+# --- CÁLCULO TFG ---
 tfg_str = ""
 if cr_n and cr_n > 0:
     factor_mdrd = 0.742 if sexo_paciente == "Femenino" else 1.0
@@ -581,7 +752,7 @@ with tab_planes:
         if is_sepsis:
             val_s = sofa if sofa.strip() else f"{s_pts} (Auto)"
             val_q = qsofa if qsofa.strip() else f"{q_calc} (Auto)"
-            val_a = apache if apache.strip() else "Pendiente"
+            val_a = apache if apache.strip() else apache_final_str
             auto_scores_list.append(f"Sepsis -> SOFA: {val_s} | qSOFA: {val_q} | APACHE II: {val_a}")
         if is_nac:
             val_c = curb65 if curb65.strip() else f"{c_calc} (Auto)"
@@ -591,14 +762,19 @@ with tab_planes:
         if is_renal:
             auto_scores_list.append(f"Renal -> IRA: {kdigo_ira if kdigo_ira.strip() else 'Pendiente'} | ERC: {kdigo_erc if kdigo_erc.strip() else 'Pendiente'}{tfg_str}")
         if is_hepato:
-            auto_scores_list.append(f"Hepato -> Child-Pugh: {child if child.strip() else 'Pendiente'} | MELD: {meld if meld.strip() else 'Pendiente'}")
+            val_child = child if child.strip() else child_auto_str
+            val_meld = meld if meld.strip() else meld_auto_str
+            auto_scores_list.append(f"Hepatopatía -> Child-Pugh: {val_child} | MELD: {val_meld}")
+        if is_pancreas:
+            val_bisap = bisap if bisap.strip() else bisap_auto_str
+            auto_scores_list.append(f"Pancreatitis -> BISAP: {val_bisap} | Ranson: {ranson if ranson.strip() else 'Pendiente'} | Balthazar: {balthazar}")
 
         if auto_scores_list:
-            st.info("**Scores calculados / listados automáticamente según diagnóstico:**\n\n" + "\n".join([f"- {s}" for s in auto_scores_list]))
+            st.info("**Scores Listados Automáticamente:**\n\n" + "\n".join([f"- {s}" for s in auto_scores_list]))
         else:
-            st.caption("No se detectaron diagnósticos en la lista que activen un panel automático de scores.")
+            st.caption("No se detectaron diagnósticos que activen paneles automáticos de scores.")
 
-        problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", placeholder="Ej: Falla renal aguda en plan de hemodiálisis...", height=80)
+        problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", height=80)
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
@@ -606,25 +782,17 @@ with tab_planes:
 
     st.divider()
 
-    # --- BOTONES DE CONTROL GENERAL ---
     col_gen, col_limp = st.columns(2)
-
     btn_generar = col_gen.button("🚀 Generar Evolución", use_container_width=True, type="primary")
-
-    # NUEVA FUNCIÓN DE BORRADO ABSOLUTO
     btn_limpiar = col_limp.button("🧹 LIMPIAR PLANILLA", use_container_width=True)
 
     if btn_limpiar:
-        # Borra todos los identificadores en memoria y recarga (limpia 100% de la interfaz)
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        for key in list(st.session_state.keys()): del st.session_state[key]
         st.session_state['infusiones_automatizadas'] = []
         st.session_state['evolucion_generada'] = False
         st.rerun()
 
     if btn_generar:
-        st.session_state['evolucion_generada'] = True
-
         if st.session_state['infusiones_automatizadas']: str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas'])
         else: str_automatizadas = "Sin infusiones activas."
 
@@ -632,27 +800,49 @@ with tab_planes:
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
             return " | ".join(validos) if validos else ""
 
-        # --- SE AGREGÓ sato2_eab A LA LÍNEA DEL ESTADO ÁCIDO BASE ---
         l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("SatO2", sato2_eab, "%"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
         l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb, "/mm³"), ("Plaq", plaq, "/mm³")])
         l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
-        l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL")])
-        l_hepa = construir_linea_lab([("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"), ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L")])
 
-        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa] if l]
+        l_quim = construir_linea_lab([
+            ("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"),
+            ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"),
+            ("Mg", mg, "mg/dL"), ("Ca", ca_tot, "mg/dL"), ("Ca++", ca_io, "mmol/L"), ("P", fosforo, "mg/dL")
+        ])
+
+        l_hepa = construir_linea_lab([
+            ("BT", bt, "mg/dL"), ("BD", bd, "mg/dL"), ("GOT", got, "UI/L"),
+            ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L")
+        ])
+
+        # --- SE CREA LA LÍNEA DE PROTEÍNAS E INFLAMACIÓN ---
+        l_inflam = construir_linea_lab([
+            ("Prot.Tot", prot_tot, "g/dL"), ("Alb", albumina_lab, "g/dL"),
+            ("VSG", vsg, "mm/h"), ("PCR", pcr, "mg/L")
+        ])
+
+        l_bio = construir_linea_lab([
+            ("LDH", ldh, "UI/L"), ("CPK", cpk, "UI/L"), ("CPK-MB", cpk_mb, "UI/L"),
+            ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("PCT", pct, "ng/mL")
+        ])
+
+        # --- SE AÑADE LA LÍNEA l_inflam AL BLOQUE FINAL DE LABORATORIO ---
+        lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta."
 
-        ecg_items = [("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
-                     ("QRS", ecg_qrs_ms, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, "")]
+        ecg_items = [
+            ("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
+            ("QRS", ecg_qrs_ms, "ms"), ("QT", ecg_qt, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, "")
+        ]
         ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
         if ecg_conclusiones.strip():
             ecg_validos.append(f"Conclusión: {ecg_conclusiones.strip()}")
         ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
 
         est_list = []
-        if rx_torax.strip(): est_list.append(f"- Rx: {rx_torax.strip()}")
-        if tc.strip(): est_list.append(f"- TC: {tc.strip()}")
-        if eco.strip(): est_list.append(f"- Eco/POCUS: {eco.strip()}")
+        if rx_torax.strip(): est_list.append(f"- Rx Tórax/Imágenes: {rx_torax.strip()}")
+        if tc.strip(): est_list.append(f"- Tomografía (TC): {tc.strip()}")
+        if eco.strip(): est_list.append(f"- Ecografía/POCUS: {eco.strip()}")
         texto_adicionales = "\n".join(est_list)
 
         bloque_estudios = ""
@@ -660,6 +850,7 @@ with tab_planes:
             partes_estudios = [p for p in [ecg_final, texto_adicionales] if p]
             bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join(partes_estudios) + "\n"
 
+        # --- SE RECONSTRUYE TODA LA INFECTOLOGÍA COMPLETA PARA LA EXPORTACIÓN ---
         lista_cultivos = []
         if cult_hemo.strip(): lista_cultivos.append(f"Hemo: {cult_hemo.strip()}")
         if cult_uro.strip(): lista_cultivos.append(f"Uro: {cult_uro.strip()}")
@@ -676,11 +867,9 @@ with tab_planes:
 
         tam_str = f"{tam_val}" if tam_val != "" else "-"
         pp_str = f"{pp_val}" if pp_val != "" else "-"
-
         par_str = ""
         if fc_n is not None and pvc_n is not None and tam_val and tam_val > 0:
-            par_val = (fc_n * pvc_n) / tam_val
-            par_str = f"\n  PAR: {par_val:.2f}"
+            par_str = f"\n  PAR: {(fc_n * pvc_n) / tam_val:.2f}"
 
         signos_vitales = f"""- SIGNOS VITALES:
   TA: {ta if ta.strip() else '-'} mmHg
@@ -700,7 +889,6 @@ with tab_planes:
             if not dp_final and pplat_val and peep:
                 try: dp_final = str(int(pplat_val - float(peep)))
                 except: pass
-
             texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
   Mecánica: P.Pico {ppico} cmH2O | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}"""
@@ -711,21 +899,14 @@ with tab_planes:
 
         balance_txt = ""
         if ingresos and egresos:
-            try:
-                bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.'))
-                balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance: {bal:+.0f} ml)"
+            try: bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.')); balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance: {bal:+.0f} ml)"
             except: pass
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
-        bloque_scores_impresion = ""
-        if auto_scores_list:
-            bloque_scores_impresion = "\n".join([f"- {s}" for s in auto_scores_list]) + "\n"
-
-        bloque_problemas_manual = ""
-        if problemas_activos_manual.strip():
-            bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n"
+        bloque_scores_impresion = "\n".join([f"- {s}" for s in auto_scores_list]) + "\n" if auto_scores_list else ""
+        bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
@@ -746,8 +927,7 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 - NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}.
 - CV: {ex_cv}
 - RESP: {texto_resp}
-- ABD: {ex_abd}{nutri_txt}
-- RENAL: {ex_renal}{balance_txt}
+- ABD/RENAL: {ex_abd} | {ex_renal}{nutri_txt}{balance_txt}
 
 >> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
