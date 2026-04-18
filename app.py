@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Borrado Absoluto")
+st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Índice PAR")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -90,7 +90,7 @@ d_arm_limpio = dias_arm.strip().lower()
 paciente_ventilado = bool(d_arm_limpio and d_arm_limpio not in ["0", "-", "no"])
 
 # --- INICIALIZACIÓN DE SCORES MANUALES ---
-sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = cha2ds2 = ""
+sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
 
@@ -101,7 +101,6 @@ def cargar_diccionario_medico():
     fallback_db = {
         "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario"],
         "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "cor pulmonale"],
-        "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
         "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia"],
         "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"],
         "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "encefalopatia"],
@@ -139,7 +138,6 @@ def detectar_en_db(categoria, texto):
 
 is_isquemia = detectar_en_db("isquemia", diag_norm)
 is_ic = detectar_en_db("ic", diag_norm)
-is_fa = detectar_en_db("fa", diag_norm)
 is_sepsis = detectar_en_db("sepsis", diag_norm)
 is_renal = detectar_en_db("renal", diag_norm)
 is_hepato = detectar_en_db("hepato", diag_norm)
@@ -154,7 +152,7 @@ is_hda = detectar_en_db("hda", diag_norm)
 is_cid = detectar_en_db("cid", diag_norm)
 
 # --- SCORES MÉDICOS MANUALES (Opcionales) ---
-if any([is_isquemia, is_ic, is_fa, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
+if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_epoc, is_tep, is_tvp, is_hda, is_cid]):
     st.markdown("### ⚙️ Ajustes Manuales de Scores")
     st.caption("Complete solo si desea sobrescribir el cálculo automático.")
 
@@ -170,9 +168,6 @@ if is_ic:
         nyha = ic1.selectbox("Clase NYHA", ["", "I", "II", "III", "IV"])
         stevenson = ic2.selectbox("Perfil Stevenson", ["", "A (Seco-Cal)", "B (Húm-Cal)", "C (Húm-Frío)", "L (Seco-Frío)"])
         aha_ic = ic3.selectbox("Estadio AHA", ["", "A", "B", "C", "D"])
-if is_fa:
-    with st.expander("💓 Fibrilación Auricular", expanded=False):
-        cha2ds2 = st.text_input("CHA2DS2-VASc")
 if is_sepsis:
     with st.expander("🦠 Sepsis", expanded=False):
         s1, s2, s3 = st.columns(3)
@@ -487,6 +482,8 @@ plaq_n = p_num(plaq)
 bt_n = p_num(bt)
 cr_n = p_num(cr)
 fr_n = p_num(fr)
+fc_n = p_num(fc)
+pvc_n = p_num(pvc)
 urea_n = p_num(urea)
 edad_n = int(edad_paciente)
 
@@ -523,14 +520,14 @@ if cr_n:
     elif cr_n >= 2.0: s_pts += 2
     elif cr_n >= 1.2: s_pts += 1
 
-# Calculo qSOFA CORREGIDO (Evitando TypeErrors por campos nulos)
+# Calculo qSOFA
 q_calc = sum([
     gl_val < 15,
     fr_n is not None and fr_n >= 22,
     sys_bp is not None and sys_bp <= 100
 ])
 
-# Calculo CURB-65 CORREGIDO
+# Calculo CURB-65
 c_calc = sum([
     gl_val < 15,
     urea_n is not None and urea_n >= 42,
@@ -585,7 +582,7 @@ with tab_planes:
         else:
             st.caption("No se detectaron diagnósticos en la lista que activen un panel automático de scores.")
 
-        problemas_activos = st.text_area("Narrativa / Evolución Clínica:", placeholder="Paciente cursando día 2 de internación por...", height=120)
+        problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", placeholder="Ej: Falla renal aguda en plan de hemodiálisis...", height=80)
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
@@ -663,12 +660,17 @@ with tab_planes:
         tam_str = f"{tam_val}" if tam_val != "" else "-"
         pp_str = f"{pp_val}" if pp_val != "" else "-"
 
+        par_str = ""
+        if fc_n is not None and pvc_n is not None and tam_val and tam_val > 0:
+            par_val = (fc_n * pvc_n) / tam_val
+            par_str = f"\n  PAR: {par_val:.2f}"
+
         signos_vitales = f"""- SIGNOS VITALES:
   TA: {ta if ta.strip() else '-'} mmHg
   TAM: {tam_str} mmHg
   PP: {pp_str} mmHg
   FC: {fc if fc.strip() else '-'} lpm
-  PVC: {pvc if pvc.strip() else '-'} cmH2O
+  PVC: {pvc if pvc.strip() else '-'} cmH2O{par_str}
   Rell. Capilar: {relleno_cap if relleno_cap.strip() else '-'}
   FR: {fr if fr.strip() else '-'} rpm
   SatO2: {sat if sat.strip() else '-'} %
@@ -704,6 +706,10 @@ with tab_planes:
         if auto_scores_list:
             bloque_scores_impresion = "\n".join([f"- {s}" for s in auto_scores_list]) + "\n"
 
+        bloque_problemas_manual = ""
+        if problemas_activos_manual.strip():
+            bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n"
+
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
@@ -733,8 +739,7 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 {fast_texto}
 
 (A) PROBLEMAS ACTIVOS:
-{bloque_scores_impresion}{problemas_activos}
-
+{bloque_scores_impresion}{bloque_problemas_manual}
 (P) PLAN:
 {plan}
 """
