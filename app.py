@@ -151,7 +151,7 @@ is_nac = detectar_en_db("nac", diag_norm)
 is_fa = detectar_en_db("fa", diag_norm)
 
 # --- RECOLECCIÓN DE DATOS FALTANTES PARA SCORES ---
-if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac]):
+if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac, is_fa]):
     st.markdown("### ⚙️ Complemento de Scores")
     st.caption("Complete los datos faltantes para lograr un cálculo automático preciso, o ingrese el score manualmente para sobreescribir.")
 
@@ -222,7 +222,6 @@ if is_nac:
 if is_fa:
     with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VASc)", expanded=False):
         fa1, fa2, fa3 = st.columns(3)
-
         chf = fa1.checkbox("IC / Disfunción VI")
         hta = fa1.checkbox("HTA")
         edad75 = fa2.checkbox("Edad ≥75")
@@ -386,7 +385,6 @@ with tab_clinca:
         ingresos = bh1.text_input("Ingresos Totales (ml)")
         egresos = bh2.text_input("Egresos Totales (ml)")
 
-    # --- INFECTOLOGÍA COMPLETA RESTAURADA ---
     with st.container(border=True):
         st.subheader("5. Infectología")
         tmax = st.text_input("Temp. Máxima 24h (°C)")
@@ -459,14 +457,12 @@ with tab_lab:
         fal = he5.text_input("FAL (UI/L)")
         ggt = he6.text_input("GGT (UI/L)")
 
-        # --- NUEVA FILA: PROTEÍNAS E INFLAMACIÓN ---
         pi1, pi2, pi3, pi4 = st.columns(4)
         prot_tot = pi1.text_input("Prot. Totales (g/dL)")
         albumina_lab = pi2.text_input("Albúmina (g/dL)")
         vsg = pi3.text_input("VSG (mm/h)")
         pcr = pi4.text_input("PCR (mg/L)")
 
-        # --- FILA EXISTENTE DE BIOMARCADORES ---
         b1, b2, b3, b4, b5, b6 = st.columns(6)
         ldh = b1.text_input("LDH (UI/L)")
         cpk = b2.text_input("CPK (UI/L)")
@@ -488,7 +484,6 @@ with tab_estudios:
         ecg_qrs_ms = e_col4.text_input("QRS (ms)")
         ecg_qt = e_col5.text_input("QT (ms)")
 
-        # --- CÁLCULO DE QTc BAZETT EN TIEMPO REAL ---
         qtc_ui_str = ""
         try:
             if ecg_fc.strip() and ecg_qt.strip():
@@ -723,7 +718,7 @@ if bt_n and rin_n and albumina > 0:
 bisap_auto_str = "Faltan datos"
 if urea_n is not None:
     bisap_pts = 0
-    if urea_n > 53.5: bisap_pts += 1 # BUN > 25
+    if urea_n > 53.5: bisap_pts += 1
     if gl_val < 15: bisap_pts += 1
     if edad_n > 60: bisap_pts += 1
     if bisap_derrame: bisap_pts += 1
@@ -739,6 +734,7 @@ if urea_n is not None:
 
 # --- CÁLCULO CHA₂DS₂ ---
 chadvasc_score = 0
+chadvasc_str = ""
 
 if is_fa:
     if chf: chadvasc_score += 1
@@ -751,10 +747,7 @@ if is_fa:
     if stroke: chadvasc_score += 2
     if vascular: chadvasc_score += 1
     if sexo_fem: chadvasc_score += 1
-
     chadvasc_str = f"{chadvasc_score} (Auto)"
-else:
-    chadvasc_str = ""
 
 # --- CÁLCULO TFG ---
 tfg_str = ""
@@ -772,7 +765,6 @@ def motor_scores():
         sofa_val = sofa if sofa.strip() else str(s_pts)
         qsofa_val = qsofa if qsofa.strip() else str(q_calc)
         apache_val = apache if apache.strip() else apache_final_str
-
         resultados.append({
             "categoria": "Sepsis",
             "scores": {
@@ -864,16 +856,17 @@ def motor_scores():
             }
         })
 
+    # --- FA ---
+    if is_fa:
+        resultados.append({
+            "categoria": "Fibrilación Auricular",
+            "scores": {
+                "CHA2DS2-VASc": chadvasc_str
+            }
+        })
+
     return resultados
 
-# --- FA ---
-if is_fa:
-    resultados.append({
-        "categoria": "Fibrilación Auricular",
-        "scores": {
-            "CHA2DS2-VASc": chadvasc_str
-        }
-    })
 
 with tab_planes:
     with st.container(border=True):
@@ -895,21 +888,17 @@ with tab_planes:
         scores_globales = motor_scores()
 
         if scores_globales:
-           texto_scores = []
-           for grupo in scores_globales:
-               linea = f"{grupo['categoria']} -> " + " | ".join(
-                   [f"{k}: {v}" for k, v in grupo['scores'].items()]
-               )
-               texto_scores.append(f"- {linea}")
+            texto_scores = []
+            for grupo in scores_globales:
+                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
+                linea = f"{grupo['categoria']} -> {lineas_detalle}"
+                texto_scores.append(f"- {linea}")
 
-           st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
-       else:
-           st.caption("No se detectaron scores automáticos.")
+            st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
+        else:
+            st.caption("No se detectaron scores automáticos.")
 
-       problemas_activos_manual = st.text_area(
-           "Agregar otros problemas activos (Manual):",
-           height=80
-       )
+        problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", height=80)
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
@@ -928,8 +917,10 @@ with tab_planes:
         st.rerun()
 
     if btn_generar:
-        if st.session_state['infusiones_automatizadas']: str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas'])
-        else: str_automatizadas = "Sin infusiones activas."
+        if st.session_state['infusiones_automatizadas']:
+            str_automatizadas = " | ".join(st.session_state['infusiones_automatizadas'])
+        else:
+            str_automatizadas = "Sin infusiones activas."
 
         def construir_linea_lab(items):
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
@@ -950,7 +941,6 @@ with tab_planes:
             ("GPT", gpt, "UI/L"), ("FAL", fal, "UI/L"), ("GGT", ggt, "UI/L")
         ])
 
-        # --- SE CREA LA LÍNEA DE PROTEÍNAS E INFLAMACIÓN ---
         l_inflam = construir_linea_lab([
             ("Prot.Tot", prot_tot, "g/dL"), ("Alb", albumina_lab, "g/dL"),
             ("VSG", vsg, "mm/h"), ("PCR", pcr, "mg/L")
@@ -961,7 +951,6 @@ with tab_planes:
             ("Tropo I", tropo, "ng/mL"), ("proBNP", bnp, "pg/mL"), ("PCT", pct, "ng/mL")
         ])
 
-        # --- SE AÑADE LA LÍNEA l_inflam AL BLOQUE FINAL DE LABORATORIO ---
         lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
         texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta."
 
@@ -985,7 +974,6 @@ with tab_planes:
             partes_estudios = [p for p in [ecg_final, texto_adicionales] if p]
             bloque_estudios = "\n>> ECG Y ESTUDIOS COMPLEMENTARIOS:\n" + "\n".join(partes_estudios) + "\n"
 
-        # --- SE RECONSTRUYE TODA LA INFECTOLOGÍA COMPLETA PARA LA EXPORTACIÓN ---
         lista_cultivos = []
         if cult_hemo.strip(): lista_cultivos.append(f"Hemo: {cult_hemo.strip()}")
         if cult_uro.strip(): lista_cultivos.append(f"Uro: {cult_uro.strip()}")
@@ -1039,21 +1027,14 @@ with tab_planes:
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
-# --- CORRECCIÓN: RECONSTRUCCIÓN DE SCORES PARA LA IMPRESIÓN ---
-        scores_para_imprimir = motor_scores()
-        if is_fa:
-            scores_para_imprimir.append({
-                "categoria": "Fibrilación Auricular",
-                "scores": {"CHA2DS2-VASc": chadvasc_str}
-            })
 
         bloque_scores_impresion = ""
+        scores_para_imprimir = motor_scores()
         if scores_para_imprimir:
             lineas_impresion = []
             for grupo in scores_para_imprimir:
-                linea = f"{grupo['categoria']} -> " + " | ".join(
-                    [f"{k}: {v}" for k, v in grupo['scores'].items()]
-                )
+                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
+                linea = f"{grupo['categoria']} -> {lineas_detalle}"
                 lineas_impresion.append(f"- {linea}")
             bloque_scores_impresion = "\n".join(lineas_impresion) + "\n"
 
