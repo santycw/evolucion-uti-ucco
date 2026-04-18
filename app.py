@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Índice PAR")
+st.caption("Versión Actual | Auto-Cálculo de Scores | Cálculo por Ampollas | Índice PAR en UI")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -224,7 +224,6 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
 
-        # --- CALCULADORA DE INFUSIONES POR AMPOLLA (ARGENTINA) ---
         with st.expander("🧮 Calculadora de Infusiones Farmacológicas (Por Ampollas)", expanded=False):
             dict_calc_drogas = {
                 "Noradrenalina (4 mg)": {"unidad": "mcg/kg/min", "mg": 4.0},
@@ -287,7 +286,6 @@ with tab_clinca:
                     st.session_state['infusiones_automatizadas'] = []
                     st.rerun()
 
-        # --- SECCIÓN DE INVASIONES ---
         st.caption("Invasiones / Accesos")
         d1, d2, d3, d4 = st.columns(4)
         cvc_info = d1.text_input("CVC (Sitio/Día)")
@@ -310,9 +308,26 @@ with tab_clinca:
         sat = h4.text_input("SatO2 (%)")
         temp = h5.text_input("Temp (°C)")
 
-        v1, v2 = st.columns(2)
+        v1, v2, v3 = st.columns(3)
         pvc = v1.text_input("PVC (cmH2O)")
         relleno_cap = v2.text_input("Relleno Capilar", "< 2 seg")
+
+        # --- CÁLCULO DE PAR EN TIEMPO REAL PARA LA UI ---
+        par_ui_str = ""
+        try:
+            if ta and "/" in ta and fc.strip() and pvc.strip():
+                s_bp = float(ta.split("/")[0])
+                d_bp = float(ta.split("/")[1])
+                t_mean = (s_bp + 2 * d_bp) / 3
+                if t_mean > 0:
+                    fc_f = float(fc.replace(',', '.'))
+                    pvc_f = float(pvc.replace(',', '.'))
+                    par_calc = (fc_f * pvc_f) / t_mean
+                    par_ui_str = f"{par_calc:.2f}"
+        except:
+            pass
+
+        v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM")
 
         ex_cv = st.text_area("Ex. Cardiovascular", "Sin livideces. R1/R2 normofonéticos.")
 
@@ -379,13 +394,14 @@ with tab_lab:
     st.info("💡 Solo se imprimirán los valores que se completen explícitamente.")
     with st.container(border=True):
         st.subheader("🌬️ EAB (Estado Ácido-Base)")
-        e1, e2, e3, e4, e5, e6 = st.columns(6)
+        e1, e2, e3, e4, e5, e6, e7 = st.columns(7)
         ph = e1.text_input("pH")
         pco2 = e2.text_input("pCO2 (mmHg)")
         po2 = e3.text_input("pO2 (mmHg)")
-        hco3 = e4.text_input("HCO3 (mEq/L)")
-        eb = e5.text_input("EB (mEq/L)")
-        lactato = e6.text_input("Lac (mmol/L)")
+        sato2_eab = e4.text_input("SatO2 (%)", key="eab_sato2")
+        hco3 = e5.text_input("HCO3 (mEq/L)")
+        eb = e6.text_input("EB (mEq/L)")
+        lactato = e7.text_input("Lac (mmol/L)")
 
     with st.container(border=True):
         st.subheader("🩸 Hemograma y Coagulación")
@@ -616,7 +632,8 @@ with tab_planes:
             validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
             return " | ".join(validos) if validos else ""
 
-        l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
+        # --- SE AGREGÓ sato2_eab A LA LÍNEA DEL ESTADO ÁCIDO BASE ---
+        l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("SatO2", sato2_eab, "%"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
         l_hemo = construir_linea_lab([("Hb", hb, "g/dL"), ("Hto", hto, "%"), ("GB", gb, "/mm³"), ("Plaq", plaq, "/mm³")])
         l_coag = construir_linea_lab([("APP", app, "%"), ("KPTT", kptt, "s"), ("RIN", rin, "")])
         l_quim = construir_linea_lab([("Urea", urea, "mg/dL"), ("Cr", cr, "mg/dL"), ("Gluc", gluc, "mg/dL"), ("Na", na, "mEq/L"), ("K", potasio, "mEq/L"), ("Cl", cl, "mEq/L"), ("Mg", mg, "mg/dL")])
