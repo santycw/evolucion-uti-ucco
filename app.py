@@ -101,7 +101,7 @@ def cargar_diccionario_medico():
     fallback_db = {
         "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario"],
         "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "cor pulmonale"],
-        "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
+        "fa": ["fa", "faarv", "famrv", "fabrv", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "arritmia completa"],
         "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia"],
         "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia"],
         "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "encefalopatia"],
