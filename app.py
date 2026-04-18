@@ -114,7 +114,8 @@ def cargar_diccionario_medico():
         "tep": ["tep", "tromboembolismo", "embolia pulmonar"],
         "tvp": ["tvp", "trombosis venosa", "trombosis profunda"],
         "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis"],
-        "cid": ["cid", "coagulacion intravascular diseminada"]
+        "cid": ["cid", "coagulacion intravascular diseminada"],
+        "fa": ["fa", "fibrilacion auricular", "fibrilación auricular", "af", "auricular fibrillation", "faarv", "famrv", "fabrv"],
     }
     if os.path.exists(ruta_db):
         try:
@@ -147,6 +148,7 @@ is_pancreas = detectar_en_db("pancreas", diag_norm)
 is_acv = detectar_en_db("acv", diag_norm)
 is_hsa = detectar_en_db("hsa", diag_norm)
 is_nac = detectar_en_db("nac", diag_norm)
+is_fa = detectar_en_db("fa", diag_norm)
 
 # --- RECOLECCIÓN DE DATOS FALTANTES PARA SCORES ---
 if any([is_isquemia, is_ic, is_sepsis, is_renal, is_hepato, is_pancreas, is_acv, is_hsa, is_nac]):
@@ -217,6 +219,18 @@ if is_nac:
         n1, n2 = st.columns(2)
         curb65 = n1.text_input("CURB-65 manual")
         psi = n2.text_input("PSI / PORT manual")
+if is_fa:
+    with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VASc)", expanded=False):
+        fa1, fa2, fa3 = st.columns(3)
+
+        chf = fa1.checkbox("IC / Disfunción VI")
+        hta = fa1.checkbox("HTA")
+        edad75 = fa2.checkbox("Edad ≥75")
+        edad65 = fa2.checkbox("Edad 65-74")
+        diabetes = fa2.checkbox("Diabetes")
+        stroke = fa3.checkbox("ACV/AIT previo")
+        vascular = fa3.checkbox("Enf. vascular")
+        sexo_fem = sexo_paciente == "Femenino"
 
 st.divider()
 
@@ -723,6 +737,25 @@ if urea_n is not None:
     if sirs_pts >= 2: bisap_pts += 1
     bisap_auto_str = f"{bisap_pts}/5 (Auto)"
 
+# --- CÁLCULO CHA₂DS₂ ---
+chadvasc_score = 0
+
+if is_fa:
+    if chf: chadvasc_score += 1
+    if hta: chadvasc_score += 1
+    if edad75:
+        chadvasc_score += 2
+    elif edad65:
+        chadvasc_score += 1
+    if diabetes: chadvasc_score += 1
+    if stroke: chadvasc_score += 2
+    if vascular: chadvasc_score += 1
+    if sexo_fem: chadvasc_score += 1
+
+    chadvasc_str = f"{chadvasc_score} (Auto)"
+else:
+    chadvasc_str = ""
+
 # --- CÁLCULO TFG ---
 tfg_str = ""
 if cr_n and cr_n > 0:
@@ -832,6 +865,15 @@ def motor_scores():
         })
 
     return resultados
+
+# --- FA ---
+if is_fa:
+    resultados.append({
+        "categoria": "Fibrilación Auricular",
+        "scores": {
+            "CHA2DS2-VASc": chadvasc_str
+        }
+    })
 
 with tab_planes:
     with st.container(border=True):
