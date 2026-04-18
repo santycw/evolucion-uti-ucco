@@ -892,24 +892,24 @@ with tab_planes:
     with st.container(border=True):
         st.subheader("(A) Problemas Activos")
 
-      scores_globales = motor_scores()
+        scores_globales = motor_scores()
 
-      if scores_globales:
-          texto_scores = []
-          for grupo in scores_globales:
-              linea = f"{grupo['categoria']} -> " + " | ".join(
-                  [f"{k}: {v}" for k, v in grupo['scores'].items()]
-              )
-              texto_scores.append(f"- {linea}")
+        if scores_globales:
+           texto_scores = []
+           for grupo in scores_globales:
+               linea = f"{grupo['categoria']} -> " + " | ".join(
+                   [f"{k}: {v}" for k, v in grupo['scores'].items()]
+               )
+               texto_scores.append(f"- {linea}")
 
-          st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
-      else:
-          st.caption("No se detectaron scores automáticos.")
+           st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
+       else:
+           st.caption("No se detectaron scores automáticos.")
 
-      problemas_activos_manual = st.text_area(
-          "Agregar otros problemas activos (Manual):",
+       problemas_activos_manual = st.text_area(
+           "Agregar otros problemas activos (Manual):",
            height=80
-      )
+       )
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
