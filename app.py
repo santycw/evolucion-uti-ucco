@@ -59,7 +59,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏥 Asistente de Evolución UTI / UCCO")
-st.caption("Estructura Completa Garantizada | Lab y ECG Extendidos | Auto-Scores")
+st.caption("Estructura Completa Garantizada | Lab y ECG Extendidos | Auto-Scores | Guías ESC 2024")
 
 # --- PANEL LATERAL ---
 with st.sidebar:
@@ -74,7 +74,7 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos (Activan scores):", "1. \n2. ", height=120)
+        diagnostico = st.text_area("Diagnósticos (Escriba 'FA' para activar score):", "1. \n2. ", height=120)
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
@@ -92,10 +92,11 @@ albumina = 0.0
 meld_dialisis = False
 bisap_derrame = False
 
-# Scores manuales (Sobreescrituras)
+# Scores manuales (Sobreescrituras) e inicialización de lógicos
 sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
+chf = hta = diabetes = stroke_fa = vascular = False # Vars FA
 
 @st.cache_data
 def cargar_diccionario_medico():
@@ -115,7 +116,7 @@ def cargar_diccionario_medico():
         "tvp": ["tvp", "trombosis venosa", "trombosis profunda"],
         "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis"],
         "cid": ["cid", "coagulacion intravascular diseminada"],
-        "fa": ["fa", "fibrilacion auricular", "fibrilación auricular", "af", "auricular fibrillation", "faarv", "famrv", "fabrv"],
+        "fa": ["fa", "fibrilacion", "fibrilación auricular", "af", "auricular fibrillation", "faarv", "famrv", "fabrv", "f.a.", "f.a"]
     }
     if os.path.exists(ruta_db):
         try:
@@ -220,16 +221,14 @@ if is_nac:
         curb65 = n1.text_input("CURB-65 manual")
         psi = n2.text_input("PSI / PORT manual")
 if is_fa:
-    with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VASc)", expanded=False):
-        fa1, fa2, fa3 = st.columns(3)
-        chf = fa1.checkbox("IC / Disfunción VI")
-        hta = fa1.checkbox("HTA")
-        edad75 = fa2.checkbox("Edad ≥75")
-        edad65 = fa2.checkbox("Edad 65-74")
-        diabetes = fa2.checkbox("Diabetes")
-        stroke = fa3.checkbox("ACV/AIT previo")
-        vascular = fa3.checkbox("Enf. vascular")
-        sexo_fem = sexo_paciente == "Femenino"
+    with st.expander("🫀 Fibrilación Auricular (CHA₂DS₂-VA | ESC 2024)", expanded=False):
+        st.info("💡 **Nota:** La edad se lee de forma automática del panel lateral. Según Guías ESC 2024, se omite la categoría de sexo.")
+        fa1, fa2 = st.columns(2)
+        chf = fa1.checkbox("Insuf. Cardíaca / Disfunción VI (C - 1 pt)")
+        hta = fa1.checkbox("Hipertensión Arterial (H - 1 pt)")
+        diabetes = fa1.checkbox("Diabetes Mellitus (D - 1 pt)")
+        stroke_fa = fa2.checkbox("ACV / TIA previo (S₂ - 2 pts)")
+        vascular = fa2.checkbox("Enfermedad Vascular (V - 1 pt)")
 
 st.divider()
 
@@ -732,22 +731,21 @@ if urea_n is not None:
     if sirs_pts >= 2: bisap_pts += 1
     bisap_auto_str = f"{bisap_pts}/5 (Auto)"
 
-# --- CÁLCULO CHA₂DS₂ ---
-chadvasc_score = 0
-chadvasc_str = ""
+# --- CÁLCULO CHA₂DS₂-VA (Guías ESC 2024) ---
+chadva_score = 0
+chadva_str = ""
 
 if is_fa:
-    if chf: chadvasc_score += 1
-    if hta: chadvasc_score += 1
-    if edad75:
-        chadvasc_score += 2
-    elif edad65:
-        chadvasc_score += 1
-    if diabetes: chadvasc_score += 1
-    if stroke: chadvasc_score += 2
-    if vascular: chadvasc_score += 1
-    if sexo_fem: chadvasc_score += 1
-    chadvasc_str = f"{chadvasc_score} (Auto)"
+    if chf: chadva_score += 1
+    if hta: chadva_score += 1
+    if edad_n >= 75:
+        chadva_score += 2
+    elif 65 <= edad_n <= 74:
+        chadva_score += 1
+    if diabetes: chadva_score += 1
+    if stroke_fa: chadva_score += 2
+    if vascular: chadva_score += 1
+    chadva_str = f"{chadva_score} pts (Auto)"
 
 # --- CÁLCULO TFG ---
 tfg_str = ""
@@ -760,7 +758,6 @@ if cr_n and cr_n > 0:
 def motor_scores():
     resultados = []
 
-    # --- SEPSIS ---
     if is_sepsis:
         sofa_val = sofa if sofa.strip() else str(s_pts)
         qsofa_val = qsofa if qsofa.strip() else str(q_calc)
@@ -774,7 +771,6 @@ def motor_scores():
             }
         })
 
-    # --- CARDIO ---
     if is_isquemia:
         resultados.append({
             "categoria": "SCA/IAM",
@@ -795,7 +791,6 @@ def motor_scores():
             }
         })
 
-    # --- RENAL ---
     if is_renal:
         resultados.append({
             "categoria": "Renal",
@@ -806,7 +801,6 @@ def motor_scores():
             }
         })
 
-    # --- HEPATO ---
     if is_hepato:
         resultados.append({
             "categoria": "Hepatopatía",
@@ -816,7 +810,6 @@ def motor_scores():
             }
         })
 
-    # --- PANCREAS ---
     if is_pancreas:
         resultados.append({
             "categoria": "Pancreatitis",
@@ -827,7 +820,6 @@ def motor_scores():
             }
         })
 
-    # --- NEURO ---
     if is_acv:
         resultados.append({
             "categoria": "ACV",
@@ -846,7 +838,6 @@ def motor_scores():
             }
         })
 
-    # --- RESP ---
     if is_nac:
         resultados.append({
             "categoria": "Neumonía",
@@ -856,12 +847,11 @@ def motor_scores():
             }
         })
 
-    # --- FA ---
     if is_fa:
         resultados.append({
             "categoria": "Fibrilación Auricular",
             "scores": {
-                "CHA2DS2-VASc": chadvasc_str
+                "CHA₂DS₂-VA (ESC 2024)": chadva_str
             }
         })
 
@@ -896,7 +886,7 @@ with tab_planes:
 
             st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
         else:
-            st.caption("No se detectaron scores automáticos.")
+            st.caption("No se detectaron scores automáticos. Escriba diagnósticos clave arriba para activarlos (ej. Sepsis, IAM, FA).")
 
         problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", height=80)
 
