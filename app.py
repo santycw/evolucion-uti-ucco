@@ -1039,8 +1039,24 @@ with tab_planes:
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
+# --- CORRECCIÓN: RECONSTRUCCIÓN DE SCORES PARA LA IMPRESIÓN ---
+        scores_para_imprimir = motor_scores()
+        if is_fa:
+            scores_para_imprimir.append({
+                "categoria": "Fibrilación Auricular",
+                "scores": {"CHA2DS2-VASc": chadvasc_str}
+            })
 
-        bloque_scores_impresion = "\n".join([f"- {s}" for s in auto_scores_list]) + "\n" if auto_scores_list else ""
+        bloque_scores_impresion = ""
+        if scores_para_imprimir:
+            lineas_impresion = []
+            for grupo in scores_para_imprimir:
+                linea = f"{grupo['categoria']} -> " + " | ".join(
+                    [f"{k}: {v}" for k, v in grupo['scores'].items()]
+                )
+                lineas_impresion.append(f"- {linea}")
+            bloque_scores_impresion = "\n".join(lineas_impresion) + "\n"
+
         bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
