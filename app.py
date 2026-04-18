@@ -730,6 +730,108 @@ if cr_n and cr_n > 0:
     mdrd_val = 175 * (cr_n ** -1.154) * (edad_n ** -0.203) * factor_mdrd
     tfg_str = f" | TFG (MDRD4): {mdrd_val:.1f} ml/min"
 
+# --- MOTOR INTELIGENTE CENTRAL DE SCORES ---
+def motor_scores():
+    resultados = []
+
+    # --- SEPSIS ---
+    if is_sepsis:
+        sofa_val = sofa if sofa.strip() else str(s_pts)
+        qsofa_val = qsofa if qsofa.strip() else str(q_calc)
+        apache_val = apache if apache.strip() else apache_final_str
+
+        resultados.append({
+            "categoria": "Sepsis",
+            "scores": {
+                "SOFA": sofa_val,
+                "qSOFA": qsofa_val,
+                "APACHE II": apache_val
+            }
+        })
+
+    # --- CARDIO ---
+    if is_isquemia:
+        resultados.append({
+            "categoria": "SCA/IAM",
+            "scores": {
+                "Killip": killip if killip else "Pendiente",
+                "GRACE": grace if grace else "Pendiente",
+                "TIMI": timi if timi else "Pendiente"
+            }
+        })
+
+    if is_ic:
+        resultados.append({
+            "categoria": "Insuficiencia Cardíaca",
+            "scores": {
+                "NYHA": nyha if nyha else "Pendiente",
+                "Stevenson": stevenson if stevenson else "Pendiente",
+                "AHA": aha_ic if aha_ic else "Pendiente"
+            }
+        })
+
+    # --- RENAL ---
+    if is_renal:
+        resultados.append({
+            "categoria": "Renal",
+            "scores": {
+                "KDIGO IRA": kdigo_ira if kdigo_ira else "Pendiente",
+                "ERC": kdigo_erc if kdigo_erc else "Pendiente",
+                "TFG": tfg_str if tfg_str else "No calculado"
+            }
+        })
+
+    # --- HEPATO ---
+    if is_hepato:
+        resultados.append({
+            "categoria": "Hepatopatía",
+            "scores": {
+                "Child-Pugh": child if child else child_auto_str,
+                "MELD": meld if meld else meld_auto_str
+            }
+        })
+
+    # --- PANCREAS ---
+    if is_pancreas:
+        resultados.append({
+            "categoria": "Pancreatitis",
+            "scores": {
+                "BISAP": bisap if bisap else bisap_auto_str,
+                "Ranson": ranson if ranson else "Pendiente",
+                "Balthazar": balthazar if balthazar else "Pendiente"
+            }
+        })
+
+    # --- NEURO ---
+    if is_acv:
+        resultados.append({
+            "categoria": "ACV",
+            "scores": {
+                "NIHSS": nihss if nihss else "Pendiente",
+                "mRS": mrs if mrs else "Pendiente"
+            }
+        })
+
+    if is_hsa:
+        resultados.append({
+            "categoria": "HSA",
+            "scores": {
+                "Hunt & Hess": hunt if hunt else "Pendiente",
+                "Fisher": fisher if fisher else "Pendiente"
+            }
+        })
+
+    # --- RESP ---
+    if is_nac:
+        resultados.append({
+            "categoria": "Neumonía",
+            "scores": {
+                "CURB-65": curb65 if curb65 else str(c_calc),
+                "PSI": psi if psi else "Pendiente"
+            }
+        })
+
+    return resultados
 
 with tab_planes:
     with st.container(border=True):
@@ -748,33 +850,19 @@ with tab_planes:
     with st.container(border=True):
         st.subheader("(A) Problemas Activos")
 
-        auto_scores_list = []
-        if is_sepsis:
-            val_s = sofa if sofa.strip() else f"{s_pts} (Auto)"
-            val_q = qsofa if qsofa.strip() else f"{q_calc} (Auto)"
-            val_a = apache if apache.strip() else apache_final_str
-            auto_scores_list.append(f"Sepsis -> SOFA: {val_s} | qSOFA: {val_q} | APACHE II: {val_a}")
-        if is_nac:
-            val_c = curb65 if curb65.strip() else f"{c_calc} (Auto)"
-            auto_scores_list.append(f"Neumonía -> CURB-65: {val_c} | PSI: {psi if psi.strip() else 'Pendiente'}")
-        if is_isquemia:
-            auto_scores_list.append(f"SCA/IAM -> Killip: {killip if killip.strip() else 'Pendiente'} | GRACE: {grace if grace.strip() else 'Pendiente'} | TIMI: {timi if timi.strip() else 'Pendiente'}")
-        if is_renal:
-            auto_scores_list.append(f"Renal -> IRA: {kdigo_ira if kdigo_ira.strip() else 'Pendiente'} | ERC: {kdigo_erc if kdigo_erc.strip() else 'Pendiente'}{tfg_str}")
-        if is_hepato:
-            val_child = child if child.strip() else child_auto_str
-            val_meld = meld if meld.strip() else meld_auto_str
-            auto_scores_list.append(f"Hepatopatía -> Child-Pugh: {val_child} | MELD: {val_meld}")
-        if is_pancreas:
-            val_bisap = bisap if bisap.strip() else bisap_auto_str
-            auto_scores_list.append(f"Pancreatitis -> BISAP: {val_bisap} | Ranson: {ranson if ranson.strip() else 'Pendiente'} | Balthazar: {balthazar}")
+      scores_globales = motor_scores()
 
-        if auto_scores_list:
-            st.info("**Scores Listados Automáticamente:**\n\n" + "\n".join([f"- {s}" for s in auto_scores_list]))
-        else:
-            st.caption("No se detectaron diagnósticos que activen paneles automáticos de scores.")
+if scores_globales:
+    texto_scores = []
+    for grupo in scores_globales:
+        linea = f"{grupo['categoria']} -> " + " | ".join(
+            [f"{k}: {v}" for k, v in grupo['scores'].items()]
+        )
+        texto_scores.append(f"- {linea}")
 
-        problemas_activos_manual = st.text_area("Agregar otros problemas activos (Manual):", height=80)
+    st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
+else:
+    st.caption("No se detectaron scores automáticos.")
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
