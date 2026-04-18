@@ -1,0 +1,17 @@
+{
+  "isquemia": ["sca", "scacest", "scasest", "iam", "iamcest", "iamnsest", "iamsest", "infarto", "angina", "angor", "coronario", "isquemia", "sme coronario", "sindrome coronario"],
+  "ic": ["ic", "ica", "icc", "insuficiencia cardiaca", "falla cardiaca", "eap", "edema agudo de pulmon", "cor pulmonale", "disfuncion ventricular"],
+  "fa": ["fa", "fibrilacion auricular", "aleteo", "flutter", "tpsv", "taquiarritmia", "arritmia completa"],
+  "sepsis": ["sepsis", "septic", "shock", "sirs", "bacteriemia", "infeccion severa", "foco infeccioso"],
+  "renal": ["ira", "aki", "insuficiencia renal", "falla renal", "erc", "nefropatia", "fracaso renal", "uremia", "lesion renal"],
+  "hepato": ["cirrosis", "hepatopatia", "falla hepatica", "dcl", "hepatitis", "insuficiencia hepatica", "encefalopatia", "ascitis"],
+  "pancreas": ["pancreatitis", "pa", "necrosis pancreatica"],
+  "acv": ["acv", "ictus", "stroke", "isquemico", "hemorragico", "ataque cerebrovascular", "ait", "tia"],
+  "hsa": ["hsa", "hemorragia subaracnoidea", "aneurisma", "hemorragia cerebral", "hematoma intraparenquimatoso"],
+  "nac": ["nac", "neumonia", "pulmonia", "infeccion respiratoria", "bronconeumonia"],
+  "epoc": ["epoc", "bronquitis cronica", "enfisema", "aeepoc", "exacerbacion epoc"],
+  "tep": ["tep", "tromboembolismo", "embolia pulmonar", "tepa"],
+  "tvp": ["tvp", "trombosis venosa", "trombosis profunda", "etv"],
+  "hda": ["hda", "hdb", "hemorragia digestiva", "melena", "hematemesis", "enterorragia", "hematoquecia", "sangrado digestivo"],
+  "cid": ["cid", "coagulacion intravascular diseminada", "coagulopatia"]
+}
