@@ -765,7 +765,7 @@ def evaluar_morbimortalidad_sugerencias(score_name, value_str):
 
     num_matches = re.findall(r'-?\d+\.?\d*', str(value_str))
     val_num = float(num_matches[0]) if num_matches else None
-
+    
     texto = ""
     score_upper = score_name.upper()
 
@@ -775,7 +775,7 @@ def evaluar_morbimortalidad_sugerencias(score_name, value_str):
         elif val_num <= 12: texto = "[Mortalidad ~40-50%]"
         else: texto = "[Mortalidad >50%]"
         texto += " Sugerencia: Mantener soporte orgánico guiado por metas."
-
+    
     elif "QSOFA" in score_upper and val_num is not None:
         if val_num >= 2: texto = "[Alto riesgo] Sugerencia: Considerar monitoreo estricto o ingreso a UCI."
         else: texto = "[Riesgo basal]"
@@ -813,7 +813,7 @@ def evaluar_morbimortalidad_sugerencias(score_name, value_str):
         if val_num == 0: texto = "[Bajo riesgo de ACV] Sugerencia: Anticoagulación no requerida."
         elif val_num == 1: texto = "[Riesgo intermedio] Sugerencia: Considerar anticoagulación oral."
         else: texto = "[Alto riesgo] Sugerencia: Anticoagulación oral formalmente indicada."
-
+    
     return f" {texto}" if texto else ""
 
 # --- MOTOR INTELIGENTE CENTRAL DE SCORES ---
