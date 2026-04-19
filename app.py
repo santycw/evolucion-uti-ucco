@@ -122,6 +122,7 @@ def cargar_diccionario_medico():
         try:
             with open(ruta_db, "r", encoding="utf-8") as archivo:
                 data = json.load(archivo)
+                # EL ARREGLO ESTÁ AQUÍ: Forzamos que las palabras nuevas se sumen al archivo viejo
                 for k, v in fallback_db.items():
                     if k not in data:
                         data[k] = v
@@ -131,6 +132,7 @@ def cargar_diccionario_medico():
 
 db_terminologia = cargar_diccionario_medico()
 
+# EL SEGUNDO ARREGLO ESTÁ AQUÍ: Limpiamos signos de puntuación que rompen la búsqueda
 diag_norm = diagnostico.lower()
 diag_norm = diag_norm.replace('.', '').replace(',', ' ')
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
@@ -334,6 +336,7 @@ with tab_clinca:
         pvc = v1.text_input("PVC (cmH2O)")
         relleno_cap = v2.text_input("Relleno Capilar", "< 2 seg")
 
+        # --- CÁLCULO DE PAR EN TIEMPO REAL PARA LA UI ---
         par_ui_str = ""
         try:
             if ta and "/" in ta and fc.strip() and pvc.strip():
@@ -758,64 +761,6 @@ if cr_n and cr_n > 0:
     mdrd_val = 175 * (cr_n ** -1.154) * (edad_n ** -0.203) * factor_mdrd
     tfg_str = f" | TFG (MDRD4): {mdrd_val:.1f} ml/min"
 
-# --- MOTOR DE EVALUACIÓN DE MORBIMORTALIDAD Y SUGERENCIAS CLÍNICAS ---
-def evaluar_morbimortalidad_sugerencias(score_name, value_str):
-    if not value_str or "Faltan" in str(value_str) or "Pendiente" in str(value_str) or "No calculado" in str(value_str):
-        return ""
-
-    num_matches = re.findall(r'-?\d+\.?\d*', str(value_str))
-    val_num = float(num_matches[0]) if num_matches else None
-    
-    texto = ""
-    score_upper = score_name.upper()
-
-    if "SOFA" in score_upper and "QSOFA" not in score_upper and val_num is not None:
-        if val_num <= 6: texto = "[Mortalidad <10%]"
-        elif val_num <= 9: texto = "[Mortalidad ~15-20%]"
-        elif val_num <= 12: texto = "[Mortalidad ~40-50%]"
-        else: texto = "[Mortalidad >50%]"
-        texto += " Sugerencia: Mantener soporte orgánico guiado por metas."
-    
-    elif "QSOFA" in score_upper and val_num is not None:
-        if val_num >= 2: texto = "[Alto riesgo] Sugerencia: Considerar monitoreo estricto o ingreso a UCI."
-        else: texto = "[Riesgo basal]"
-
-    elif "APACHE" in score_upper and val_num is not None:
-        if val_num <= 9: texto = "[Mortalidad ~4%]"
-        elif val_num <= 14: texto = "[Mortalidad ~15%]"
-        elif val_num <= 19: texto = "[Mortalidad ~25%]"
-        elif val_num <= 24: texto = "[Mortalidad ~40%]"
-        elif val_num <= 29: texto = "[Mortalidad ~55%]"
-        else: texto = "[Mortalidad >75%]"
-
-    elif "MELD" in score_upper and val_num is not None:
-        if val_num <= 9: texto = "[Mortalidad 3 meses ~1.9%]"
-        elif val_num <= 19: texto = "[Mortalidad 3 meses ~6%]"
-        elif val_num <= 29: texto = "[Mortalidad 3 meses ~19.6%]"
-        elif val_num <= 39: texto = "[Mortalidad 3 meses ~52.6%]"
-        else: texto = "[Mortalidad 3 meses ~71.3%]"
-
-    elif "CHILD" in score_upper:
-        if "A" in str(value_str).upper(): texto = "[Sobrevida 1 año ~100%]"
-        elif "B" in str(value_str).upper(): texto = "[Sobrevida 1 año ~80%]"
-        elif "C" in str(value_str).upper(): texto = "[Sobrevida 1 año ~45%]"
-
-    elif "BISAP" in score_upper and val_num is not None:
-        if val_num <= 2: texto = "[Mortalidad <2%]"
-        else: texto = "[Mortalidad >15%] Sugerencia: Alto riesgo de necrosis o falla orgánica. Soporte intensivo."
-
-    elif "CURB-65" in score_upper and val_num is not None:
-        if val_num <= 1: texto = "[Mortalidad <2%] Sugerencia: Tratamiento ambulatorio."
-        elif val_num == 2: texto = "[Mortalidad ~9%] Sugerencia: Considerar hospitalización en sala."
-        else: texto = "[Mortalidad 15-40%] Sugerencia: Hospitalización en UCI."
-
-    elif "CHA₂DS₂-VA" in score_upper and val_num is not None:
-        if val_num == 0: texto = "[Bajo riesgo de ACV] Sugerencia: Anticoagulación no requerida."
-        elif val_num == 1: texto = "[Riesgo intermedio] Sugerencia: Considerar anticoagulación oral."
-        else: texto = "[Alto riesgo] Sugerencia: Anticoagulación oral formalmente indicada."
-    
-    return f" {texto}" if texto else ""
-
 # --- MOTOR INTELIGENTE CENTRAL DE SCORES ---
 def motor_scores():
     resultados = []
@@ -942,11 +887,7 @@ with tab_planes:
         if scores_globales:
             texto_scores = []
             for grupo in scores_globales:
-                partes_evaluadas = []
-                for k, v in grupo['scores'].items():
-                    evaluacion = evaluar_morbimortalidad_sugerencias(k, v)
-                    partes_evaluadas.append(f"{k}: {v}{evaluacion}")
-                lineas_detalle = " | ".join(partes_evaluadas)
+                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
                 linea = f"{grupo['categoria']} -> {lineas_detalle}"
                 texto_scores.append(f"- {linea}")
 
@@ -1089,11 +1030,7 @@ with tab_planes:
         if scores_para_imprimir:
             lineas_impresion = []
             for grupo in scores_para_imprimir:
-                partes_evaluadas = []
-                for k, v in grupo['scores'].items():
-                    evaluacion = evaluar_morbimortalidad_sugerencias(k, v)
-                    partes_evaluadas.append(f"{k}: {v}{evaluacion}")
-                lineas_detalle = " | ".join(partes_evaluadas)
+                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
                 linea = f"{grupo['categoria']} -> {lineas_detalle}"
                 lineas_impresion.append(f"- {linea}")
             bloque_scores_impresion = "\n".join(lineas_impresion) + "\n"
