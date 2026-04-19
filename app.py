@@ -96,7 +96,7 @@ bisap_derrame = False
 sofa = qsofa = apache = killip = grace = timi = nyha = stevenson = aha_ic = ""
 kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
-chf = hta = diabetes = stroke_fa = vascular = False 
+chf = hta = diabetes = stroke_fa = vascular = False
 
 @st.cache_data
 def cargar_diccionario_medico():
@@ -134,7 +134,7 @@ db_terminologia = cargar_diccionario_medico()
 
 # EL SEGUNDO ARREGLO ESTÁ AQUÍ: Limpiamos signos de puntuación que rompen la búsqueda
 diag_norm = diagnostico.lower()
-diag_norm = diag_norm.replace('.', '').replace(',', ' ') 
+diag_norm = diag_norm.replace('.', '').replace(',', ' ')
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
 diag_norm = re.sub(r'[éëêè]', 'e', diag_norm)
 diag_norm = re.sub(r'[íïîì]', 'i', diag_norm)
