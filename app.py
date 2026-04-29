@@ -10,6 +10,12 @@ if 'evolucion_generada' not in st.session_state:
     st.session_state['evolucion_generada'] = False
 if 'infusiones_automatizadas' not in st.session_state:
     st.session_state['infusiones_automatizadas'] = []
+if 'limpiar_prellenado' not in st.session_state:
+    st.session_state['limpiar_prellenado'] = False
+
+def d_str(valor_default):
+    """Retorna un string vacío si la orden de limpieza global está activa."""
+    return "" if st.session_state['limpiar_prellenado'] else valor_default
 
 # --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
 def calcular_infusion_universal(modo, cantidad_droga_mg_ui, volumen_ml, peso_kg, valor_input, unidad_objetivo):
@@ -74,7 +80,7 @@ with st.sidebar:
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
-        diagnostico = st.text_area("Diagnósticos (Escriba 'FA' para activar score):", "1. \n2. ", height=120)
+        diagnostico = st.text_area("Diagnósticos (Escriba 'FA' para activar score):", d_str("1. \n2. "), height=120)
 
 hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
@@ -122,7 +128,6 @@ def cargar_diccionario_medico():
         try:
             with open(ruta_db, "r", encoding="utf-8") as archivo:
                 data = json.load(archivo)
-                # EL ARREGLO ESTÁ AQUÍ: Forzamos que las palabras nuevas se sumen al archivo viejo
                 for k, v in fallback_db.items():
                     if k not in data:
                         data[k] = v
@@ -132,7 +137,6 @@ def cargar_diccionario_medico():
 
 db_terminologia = cargar_diccionario_medico()
 
-# EL SEGUNDO ARREGLO ESTÁ AQUÍ: Limpiamos signos de puntuación que rompen la búsqueda
 diag_norm = diagnostico.lower()
 diag_norm = diag_norm.replace('.', '').replace(',', ' ')
 diag_norm = re.sub(r'[áäâà]', 'a', diag_norm)
@@ -250,7 +254,7 @@ tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
 with tab_clinca:
     with st.container(border=True):
         st.subheader("(S) Subjetivo")
-        subj = st.text_area("Novedades:", "Paciente estable, sin intercurrencias agudas.", height=68)
+        subj = st.text_area("Novedades:", d_str("Paciente estable, sin intercurrencias agudas."), height=68)
 
     with st.container(border=True):
         st.subheader("💊 Infusiones y Dispositivos")
@@ -320,10 +324,10 @@ with tab_clinca:
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
         n1, n2, n3, n4 = st.columns(4)
-        neuro_estado = n1.text_input("Estado", "Alerta")
-        glasgow = n2.text_input("Glasgow", "15/15")
-        rass = n3.text_input("RASS", "0")
-        cam = n4.text_input("CAM-ICU", "-")
+        neuro_estado = n1.text_input("Estado", d_str("Alerta"))
+        glasgow = n2.text_input("Glasgow", d_str("15/15"))
+        rass = n3.text_input("RASS", d_str("0"))
+        cam = n4.text_input("CAM-ICU", d_str("-"))
 
         h1, h2, h3, h4, h5 = st.columns(5)
         ta = h1.text_input("TA", placeholder="120/80")
@@ -334,9 +338,8 @@ with tab_clinca:
 
         v1, v2, v3 = st.columns(3)
         pvc = v1.text_input("PVC (cmH2O)")
-        relleno_cap = v2.text_input("Relleno Capilar", "< 2 seg")
+        relleno_cap = v2.text_input("Relleno Capilar", d_str("< 2 seg"))
 
-        # --- CÁLCULO DE PAR EN TIEMPO REAL PARA LA UI ---
         par_ui_str = ""
         try:
             if ta and "/" in ta and fc.strip() and pvc.strip():
@@ -351,13 +354,13 @@ with tab_clinca:
         except: pass
         v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM")
 
-        ex_cv = st.text_area("Ex. Cardiovascular", "Sin livideces. R1/R2 normofonéticos.")
+        ex_cv = st.text_area("Ex. Cardiovascular", d_str("Sin livideces. R1/R2 normofonéticos."))
 
     with st.container(border=True):
         st.subheader("2. Respiratorio y ARM")
         r_b1, r_b2, r_b3 = st.columns(3)
         if paciente_ventilado:
-            via_aerea = r_b1.text_input("Vía Aérea", "TOT")
+            via_aerea = r_b1.text_input("Vía Aérea", d_str("TOT"))
         else:
             via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Reservorio", "CAF", "VNI", "TQTAA"])
 
@@ -367,7 +370,7 @@ with tab_clinca:
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
         if paciente_ventilado:
             r1, r2, r3, r4 = st.columns(4)
-            modo = r1.text_input("Modo", "VCV")
+            modo = r1.text_input("Modo", d_str("VCV"))
             peep = r2.number_input("PEEP (cmH2O)", 0, 30, 5)
             vt = r3.text_input("Vt (ml)")
             dp_manual = r4.text_input("Driving P.")
@@ -376,20 +379,23 @@ with tab_clinca:
             pplat = r6.text_input("P.Plateau (cmH2O)")
             comp = r7.text_input("Comp.")
 
-        ex_resp = st.text_input("Examen Respiratorio", "Buena entrada de aire bilateral.")
+        ex_resp = st.text_input("Examen Respiratorio", d_str("Buena entrada de aire bilateral."))
 
     with st.container(border=True):
         st.subheader("3. Digestivo y Nutrición")
         a1, a2 = st.columns(2)
-        ex_abd = a1.text_input("Abdomen", "Blando, depresible.")
+        ex_abd = a1.text_input("Abdomen", d_str("Blando, depresible."))
         nutricion = a2.selectbox("Nutrición", ["", "Ayuno", "SNG / Enteral", "NPT", "Oral"])
 
     with st.container(border=True):
         st.subheader("4. Renal y Balance Hídrico")
-        ex_renal = st.text_input("Diuresis / Ex. Renal", "Conservada.")
-        bh1, bh2 = st.columns(2)
-        ingresos = bh1.text_input("Ingresos Totales (ml)")
-        egresos = bh2.text_input("Egresos Totales (ml)")
+        ex_renal = st.text_input("Examen Renal", d_str("Conservado."))
+        st.caption("Egresos y Balance (ml)")
+        bh1, bh2, bh3, bh4 = st.columns(4)
+        ingresos = bh1.text_input("Ingresos Totales")
+        diuresis = bh2.text_input("Diuresis")
+        drenajes = bh3.text_input("Drenajes")
+        catarsis = bh4.text_input("Catarsis")
 
     with st.container(border=True):
         st.subheader("5. Infectología")
@@ -761,6 +767,64 @@ if cr_n and cr_n > 0:
     mdrd_val = 175 * (cr_n ** -1.154) * (edad_n ** -0.203) * factor_mdrd
     tfg_str = f" | TFG (MDRD4): {mdrd_val:.1f} ml/min"
 
+# --- MOTOR DE EVALUACIÓN DE MORBIMORTALIDAD Y SUGERENCIAS CLÍNICAS ---
+def evaluar_morbimortalidad_sugerencias(score_name, value_str):
+    if not value_str or "Faltan" in str(value_str) or "Pendiente" in str(value_str) or "No calculado" in str(value_str):
+        return ""
+
+    num_matches = re.findall(r'-?\d+\.?\d*', str(value_str))
+    val_num = float(num_matches[0]) if num_matches else None
+    
+    texto = ""
+    score_upper = score_name.upper()
+
+    if "SOFA" in score_upper and "QSOFA" not in score_upper and val_num is not None:
+        if val_num <= 6: texto = "[Mortalidad <10%]"
+        elif val_num <= 9: texto = "[Mortalidad ~15-20%]"
+        elif val_num <= 12: texto = "[Mortalidad ~40-50%]"
+        else: texto = "[Mortalidad >50%]"
+        texto += " Sugerencia: Mantener soporte orgánico guiado por metas."
+    
+    elif "QSOFA" in score_upper and val_num is not None:
+        if val_num >= 2: texto = "[Alto riesgo] Sugerencia: Considerar monitoreo estricto o ingreso a UCI."
+        else: texto = "[Riesgo basal]"
+
+    elif "APACHE" in score_upper and val_num is not None:
+        if val_num <= 9: texto = "[Mortalidad ~4%]"
+        elif val_num <= 14: texto = "[Mortalidad ~15%]"
+        elif val_num <= 19: texto = "[Mortalidad ~25%]"
+        elif val_num <= 24: texto = "[Mortalidad ~40%]"
+        elif val_num <= 29: texto = "[Mortalidad ~55%]"
+        else: texto = "[Mortalidad >75%]"
+
+    elif "MELD" in score_upper and val_num is not None:
+        if val_num <= 9: texto = "[Mortalidad 3 meses ~1.9%]"
+        elif val_num <= 19: texto = "[Mortalidad 3 meses ~6%]"
+        elif val_num <= 29: texto = "[Mortalidad 3 meses ~19.6%]"
+        elif val_num <= 39: texto = "[Mortalidad 3 meses ~52.6%]"
+        else: texto = "[Mortalidad 3 meses ~71.3%]"
+
+    elif "CHILD" in score_upper:
+        if "A" in str(value_str).upper(): texto = "[Sobrevida 1 año ~100%]"
+        elif "B" in str(value_str).upper(): texto = "[Sobrevida 1 año ~80%]"
+        elif "C" in str(value_str).upper(): texto = "[Sobrevida 1 año ~45%]"
+
+    elif "BISAP" in score_upper and val_num is not None:
+        if val_num <= 2: texto = "[Mortalidad <2%]"
+        else: texto = "[Mortalidad >15%] Sugerencia: Alto riesgo de necrosis o falla orgánica. Soporte intensivo."
+
+    elif "CURB-65" in score_upper and val_num is not None:
+        if val_num <= 1: texto = "[Mortalidad <2%] Sugerencia: Tratamiento ambulatorio."
+        elif val_num == 2: texto = "[Mortalidad ~9%] Sugerencia: Considerar hospitalización en sala."
+        else: texto = "[Mortalidad 15-40%] Sugerencia: Hospitalización en UCI."
+
+    elif "CHA₂DS₂-VA" in score_upper and val_num is not None:
+        if val_num == 0: texto = "[Bajo riesgo de ACV] Sugerencia: Anticoagulación no requerida."
+        elif val_num == 1: texto = "[Riesgo intermedio] Sugerencia: Considerar anticoagulación oral."
+        else: texto = "[Alto riesgo] Sugerencia: Anticoagulación oral formalmente indicada."
+    
+    return f" {texto}" if texto else ""
+
 # --- MOTOR INTELIGENTE CENTRAL DE SCORES ---
 def motor_scores():
     resultados = []
@@ -887,7 +951,11 @@ with tab_planes:
         if scores_globales:
             texto_scores = []
             for grupo in scores_globales:
-                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
+                partes_evaluadas = []
+                for k, v in grupo['scores'].items():
+                    evaluacion = evaluar_morbimortalidad_sugerencias(k, v)
+                    partes_evaluadas.append(f"{k}: {v}{evaluacion}")
+                lineas_detalle = " | ".join(partes_evaluadas)
                 linea = f"{grupo['categoria']} -> {lineas_detalle}"
                 texto_scores.append(f"- {linea}")
 
@@ -899,7 +967,7 @@ with tab_planes:
 
     with st.container(border=True):
         st.subheader("(P) Plan 24hs")
-        plan = st.text_area("Indicaciones / Conducta:", "- Cultivar: \n- Interconsultas:", height=100)
+        plan = st.text_area("Indicaciones / Conducta:", d_str("- Cultivar: \n- Interconsultas:"), height=100)
 
     st.divider()
 
@@ -911,6 +979,7 @@ with tab_planes:
         for key in list(st.session_state.keys()): del st.session_state[key]
         st.session_state['infusiones_automatizadas'] = []
         st.session_state['evolucion_generada'] = False
+        st.session_state['limpiar_prellenado'] = True
         st.rerun()
 
     if btn_generar:
@@ -1018,9 +1087,25 @@ with tab_planes:
   Examen: {ex_resp}"""
 
         balance_txt = ""
-        if ingresos and egresos:
-            try: bal = float(ingresos.replace(',','.')) - float(egresos.replace(',','.')); balance_txt = f" | Ingresos: {ingresos} ml / Egresos: {egresos} ml (Balance: {bal:+.0f} ml)"
-            except: pass
+        val_in = p_num(ingresos)
+        val_diu = p_num(diuresis)
+        val_dre = p_num(drenajes)
+        val_cat = p_num(catarsis)
+
+        egresos_list = []
+        if diuresis.strip(): egresos_list.append(f"Diuresis {diuresis.strip()}")
+        if drenajes.strip(): egresos_list.append(f"Drenajes {drenajes.strip()}")
+        if catarsis.strip(): egresos_list.append(f"Catarsis {catarsis.strip()}")
+
+        if val_in is not None or egresos_list:
+            v_in = val_in if val_in is not None else 0.0
+            v_out = (val_diu if val_diu is not None else 0.0) + \
+                    (val_dre if val_dre is not None else 0.0) + \
+                    (val_cat if val_cat is not None else 0.0)
+            bal = v_in - v_out
+            ing_str = ingresos.strip() if ingresos.strip() else "0"
+            str_egresos = " | ".join(egresos_list) if egresos_list else "0"
+            balance_txt = f" | Ingresos: {ing_str} ml / Egresos: [{str_egresos}] (Balance: {bal:+.0f} ml)"
 
         nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
         fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
@@ -1030,7 +1115,11 @@ with tab_planes:
         if scores_para_imprimir:
             lineas_impresion = []
             for grupo in scores_para_imprimir:
-                lineas_detalle = " | ".join([f"{k}: {v}" for k, v in grupo['scores'].items()])
+                partes_evaluadas = []
+                for k, v in grupo['scores'].items():
+                    evaluacion = evaluar_morbimortalidad_sugerencias(k, v)
+                    partes_evaluadas.append(f"{k}: {v}{evaluacion}")
+                lineas_detalle = " | ".join(partes_evaluadas)
                 linea = f"{grupo['categoria']} -> {lineas_detalle}"
                 lineas_impresion.append(f"- {linea}")
             bloque_scores_impresion = "\n".join(lineas_impresion) + "\n"
@@ -1056,7 +1145,7 @@ Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dia
 - NEURO: {neuro_estado}, Glasgow {glasgow}, RASS {rass}, CAM {cam}.
 - CV: {ex_cv}
 - RESP: {texto_resp}
-- ABD/RENAL: {ex_abd} | {ex_renal}{nutri_txt}{balance_txt}
+- ABD/RENAL: {ex_abd} | Ex. Renal: {ex_renal}{nutri_txt}{balance_txt}
 
 >> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
