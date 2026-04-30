@@ -19,6 +19,13 @@ def d_str(valor_default):
     """Retorna un string vacío si la orden de limpieza global está activa."""
     return "" if st.session_state.get('limpiar_prellenado', False) else valor_default
 
+def rerun_app():
+    """Reejecuta la app manteniendo compatibilidad con versiones de Streamlit."""
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
+
 rk = st.session_state['rk']
 
 # --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
@@ -136,7 +143,7 @@ def cargar_diccionario_medico():
                     if k not in data:
                         data[k] = v
                 return data
-        except: return fallback_db
+        except Exception: return fallback_db
     else: return fallback_db
 
 db_terminologia = cargar_diccionario_medico()
@@ -248,14 +255,14 @@ if is_fa:
 st.divider()
 
 # --- CUERPO PRINCIPAL ---
-tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
+tab_clinica, tab_lab, tab_estudios, tab_planes = st.tabs([
     "🩺 Clínica y Examen",
     "🧪 Laboratorio Integral",
     "🩻 ECG y Estudios",
     "📋 Plan y FAST-HUG"
 ])
 
-with tab_clinca:
+with tab_clinica:
     with st.container(border=True):
         st.subheader("(S) Subjetivo")
         subj = st.text_area("Novedades:", d_str("Paciente estable, sin intercurrencias agudas."), height=68, key=f"subj_{rk}")
@@ -304,7 +311,7 @@ with tab_clinca:
                         item = f"{nombre_limpio}: {dosis_calc:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
-                            st.rerun()
+                            rerun_app()
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f", key=f"dosis_obj_{rk}")
                 if droga_mg > 0 and volumen_ml > 0:
@@ -316,7 +323,7 @@ with tab_clinca:
                 for inf in st.session_state['infusiones_automatizadas']: st.markdown(f"- `{inf}`")
                 if st.button("🗑️ Borrar memoria", key=f"btn_del_mem_{rk}"):
                     st.session_state['infusiones_automatizadas'] = []
-                    st.rerun()
+                    rerun_app()
 
         st.caption("Invasiones / Accesos")
         d1, d2, d3, d4 = st.columns(4)
@@ -355,7 +362,7 @@ with tab_clinca:
                     pvc_f = float(pvc.replace(',', '.'))
                     par_calc = (fc_f * pvc_f) / t_mean
                     par_ui_str = f"{par_calc:.2f}"
-        except: pass
+        except Exception: pass
         v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM", key=f"par_{rk}")
 
         ex_cv = st.text_area("Ex. Cardiovascular", d_str("Sin livideces. R1/R2 normofonéticos."), key=f"ex_cv_{rk}")
@@ -509,7 +516,7 @@ with tab_estudios:
                     rr_sec = 60.0 / fc_val
                     qtc_val = qt_val / math.sqrt(rr_sec)
                     qtc_ui_str = f"{qtc_val:.0f}"
-        except: pass
+        except Exception: pass
 
         ecg_qtc = e_col6.text_input("QTc Auto (ms)", value=qtc_ui_str, disabled=True, help="Bazett: QT / √RR", key=f"ecg_qtc_{rk}")
         ecg_onda_p = e_col7.text_input("Onda P (ms)", key=f"ecg_ondap_{rk}")
@@ -526,7 +533,7 @@ with tab_estudios:
 # --- RUTINA CENTRAL DE AUTO-CÁLCULO ---
 def p_num(val):
     try: return float(str(val).replace(',', '.').strip())
-    except: return None
+    except Exception: return None
 
 sys_bp, dia_bp, tam_val, pp_val = None, None, "", ""
 if ta and "/" in ta:
@@ -535,12 +542,12 @@ if ta and "/" in ta:
         dia_bp = float(ta.split("/")[1])
         tam_val = round((sys_bp + 2*dia_bp)/3)
         pp_val = int(sys_bp - dia_bp)
-    except: pass
+    except Exception: pass
 
 gl_val = 15
 if glasgow:
     try: gl_val = int(glasgow.split("/")[0])
-    except: pass
+    except Exception: pass
 
 pafi_val = p_num(pafi_manual)
 po2_n = p_num(po2)
@@ -986,7 +993,7 @@ with tab_planes:
         st.session_state['infusiones_automatizadas'] = []
         st.session_state['evolucion_generada'] = False
         st.session_state['limpiar_prellenado'] = True
-        st.rerun()
+        rerun_app()
 
     if btn_generar:
         if st.session_state['infusiones_automatizadas']:
@@ -995,7 +1002,11 @@ with tab_planes:
             str_automatizadas = "Sin infusiones activas."
 
         def construir_linea_lab(items):
-            validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
+            validos = [
+                f"{nombre} {str(val).strip()} {uni}".strip()
+                for nombre, val, uni in items
+                if str(val).strip()
+            ]
             return " | ".join(validos) if validos else ""
 
         l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("SatO2", sato2_eab, "%"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
@@ -1030,7 +1041,11 @@ with tab_planes:
             ("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
             ("QRS", ecg_qrs_ms, "ms"), ("QT", ecg_qt, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, "")
         ]
-        ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
+        ecg_validos = [
+            f"{n} {str(v).strip()}{u}".strip()
+            for n, v, u in ecg_items
+            if str(v).strip()
+        ]
         if ecg_conclusiones.strip():
             ecg_validos.append(f"Conclusión: {ecg_conclusiones.strip()}")
         ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
@@ -1083,7 +1098,7 @@ with tab_planes:
             pplat_val = p_num(pplat)
             if not dp_final and pplat_val and peep:
                 try: dp_final = str(int(pplat_val - float(peep)))
-                except: pass
+                except Exception: pass
             texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
   Mecánica: P.Pico {ppico} cmH2O | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}"""
