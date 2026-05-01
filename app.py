@@ -657,7 +657,8 @@ with tab_planes:
         scores_para_imprimir = motor_scores(flags_scores, manuales_scores, auto_scores)
         datos_evolucion = dict(locals())
         datos_evolucion["infusiones_automatizadas"] = st.session_state.get("infusiones_automatizadas", [])
-        datos_evolucion["alertas_seguridad"] = alertas_seguridad
+        # Las alertas de seguridad se muestran solo en la ventana general de la app.
+        # No se incorporan al texto final de evolución.
 
         texto_final = generar_texto_evolucion(datos_evolucion, auto_scores, scores_para_imprimir)
 

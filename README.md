@@ -58,7 +58,7 @@ Se agregaron tres capas de seguridad sin cambiar el flujo general de la aplicaci
 2. **Alertas de seguridad clínica**
    - Panel visible en la pestaña Plan y FAST-HUG.
    - Alertas categorizadas como crítico, advertencia o revisión.
-   - Las alertas se imprimen en la evolución final bajo el bloque “ALERTAS DE SEGURIDAD CLÍNICA”.
+   - Las alertas son una medida de seguridad clínica visible en la app y no se imprimen en el texto final de evolución.
 
 3. **Calculadora de infusiones con rangos y doble chequeo**
    - Cada droga tiene rango orientativo configurable en `modules/infusiones.py`.

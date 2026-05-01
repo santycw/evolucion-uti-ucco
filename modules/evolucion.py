@@ -256,16 +256,6 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
 
     problemas_activos_manual = s(datos.get("problemas_activos_manual", ""))
     bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
-    alertas_seguridad = datos.get("alertas_seguridad", []) or []
-    bloque_alertas_seguridad = ""
-    if alertas_seguridad:
-        lineas_alertas = []
-        for alerta in alertas_seguridad:
-            nivel = str(alerta.get("nivel", "")).upper()
-            campo = alerta.get("campo", "Dato")
-            lineas_alertas.append(f"- [{nivel}] {campo}: {formatear_alerta(alerta)}")
-        bloque_alertas_seguridad = "\n>> ALERTAS DE SEGURIDAD CLÍNICA:\n" + "\n".join(lineas_alertas) + "\n"
-
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {datos.get('dias_int_hosp')} | Días UTI: {datos.get('dias_int_uti')} | Días ARM: {datos.get('dias_arm')}
@@ -291,7 +281,6 @@ Invasiones: CVC: {datos.get('cvc_info')} | Cat.Art: {datos.get('ca_info')} | SV:
 >> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
 {bloque_estudios}
-{bloque_alertas_seguridad}
 >> FAST HUG BID:
 {fast_texto}
 
