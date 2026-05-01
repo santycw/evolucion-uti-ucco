@@ -8,9 +8,10 @@ copiar a la historia clínica.
 from __future__ import annotations
 
 from typing import Any, Iterable, List, Tuple
+import re
 
 from .scores import formatear_scores_detectados
-from .validaciones import p_num, formatear_alerta
+from .validaciones import p_num
 
 
 def s(valor: Any) -> str:
@@ -26,6 +27,19 @@ def construir_linea_lab(items: Iterable[Tuple[str, Any, str]]) -> str:
         if s(val).strip()
     ]
     return " | ".join(validos) if validos else ""
+
+
+def eliminar_bloque_alertas_seguridad(texto: str) -> str:
+    """Garantiza que las alertas clínicas no se impriman en la evolución final."""
+    if not texto:
+        return texto
+
+    patron = (
+        r"\n?>>\s*ALERTAS DE SEGURIDAD CL[ÍI]NICA:\s*\n"
+        r"(?:.*?)(?=\n?>>\s*FAST HUG BID:|\n\(A\)\s*PROBLEMAS ACTIVOS:|\n\(P\)\s*PLAN:|\Z)"
+    )
+    texto = re.sub(patron, "\n", texto, flags=re.IGNORECASE | re.DOTALL)
+    return re.sub(r"\n{3,}", "\n\n", texto).strip() + "\n"
 
 
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:
@@ -289,4 +303,4 @@ Invasiones: CVC: {datos.get('cvc_info')} | Cat.Art: {datos.get('ca_info')} | SV:
 (P) PLAN:
 {datos.get('plan')}
 """
-    return texto_final
+    return eliminar_bloque_alertas_seguridad(texto_final)
