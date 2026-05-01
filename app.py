@@ -287,23 +287,6 @@ with tab_clinica:
                 else:
                     st.warning(f"⚠️ {mensaje}")
 
-                st.caption("Doble chequeo obligatorio antes de anexar drogas de alto riesgo a la evolución.")
-                chk_1 = st.checkbox(
-                    "Confirmo droga, presentación, dilución, unidad, peso y velocidad/dosis.",
-                    key=f"chk_inf_1_{sufijo_key}_{rk}",
-                )
-                chk_2 = st.checkbox(
-                    "Confirmo indicación médica/protocolo institucional y monitoreo correspondiente.",
-                    key=f"chk_inf_2_{sufijo_key}_{rk}",
-                )
-                chk_3 = True
-                if requiere_confirmacion_extra(evaluacion):
-                    chk_3 = st.checkbox(
-                        "Confirmo conscientemente que se anexará pese a alerta de rango o ausencia de rango.",
-                        key=f"chk_inf_3_{sufijo_key}_{rk}",
-                    )
-
-                habilitado = chk_1 and chk_2 and chk_3
                 detalle = construir_detalle_infusion(
                     nombre_limpio,
                     dosis_resultado,
@@ -313,7 +296,7 @@ with tab_clinica:
                     volumen_ml,
                 )
 
-                if st.button(f"➕ Anexar {nombre_limpio}", type="secondary", disabled=not habilitado, key=f"btn_anex_{sufijo_key}_{rk}"):
+                if st.button(f"➕ Anexar {nombre_limpio}", type="secondary", key=f"btn_anex_{sufijo_key}_{rk}"):
                     if detalle not in st.session_state['infusiones_automatizadas']:
                         st.session_state['infusiones_automatizadas'].append(detalle)
                         rerun_app()
