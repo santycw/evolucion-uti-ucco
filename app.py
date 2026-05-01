@@ -110,6 +110,12 @@ kdigo_ira = kdigo_erc = child = meld = bisap = ranson = balthazar = ""
 nihss = mrs = hunt = fisher = curb65 = psi = gold = wells_tep = pesi = wells_tvp = blatchford = rockall = isth = ""
 chf = hta = diabetes = stroke_fa = vascular = False
 
+# Variables opcionales para scores UCCO/UTI ampliados
+timi_riesgo_ge3 = timi_cad = timi_aspirina = timi_angina = timi_st = timi_marcadores = False
+heart_historia = heart_ecg = heart_riesgo = heart_troponina = ""
+hasbled_hta_no_controlada = hasbled_renal = hasbled_hepatica = False
+hasbled_sangrado = hasbled_inr_labil = hasbled_drogas = hasbled_alcohol = False
+
 db_terminologia = cargar_diccionario_medico()
 diag_norm = normalizar_texto_medico(diagnostico)
 
@@ -135,6 +141,23 @@ if is_isquemia:
         killip = c1.selectbox("Killip y Kimball", ["", "I (Sin IC)", "II (R3/Estertores)", "III (EAP)", "IV (Shock)"], key=f"killip_{rk}")
         grace = c2.text_input("GRACE Manual", key=f"grace_{rk}")
         timi = c3.text_input("TIMI Manual", key=f"timi_{rk}")
+
+        st.divider()
+        st.caption("Cálculo automático opcional TIMI / HEART. Los criterios no marcados se consideran ausentes.")
+        t_cols = st.columns(4)
+        timi_riesgo_ge3 = t_cols[0].checkbox("TIMI: ≥3 factores de riesgo coronario", key=f"timi_riesgo_ge3_{rk}")
+        timi_cad = t_cols[1].checkbox("TIMI: CAD conocida ≥50%", key=f"timi_cad_{rk}")
+        timi_aspirina = t_cols[2].checkbox("TIMI: AAS últimos 7 días", key=f"timi_aspirina_{rk}")
+        timi_angina = t_cols[3].checkbox("TIMI: ≥2 anginas 24 h", key=f"timi_angina_{rk}")
+        t2_cols = st.columns(2)
+        timi_st = t2_cols[0].checkbox("TIMI: desviación ST", key=f"timi_st_{rk}")
+        timi_marcadores = t2_cols[1].checkbox("TIMI: biomarcadores positivos", key=f"timi_marcadores_{rk}")
+
+        h1, h2, h3, h4 = st.columns(4)
+        heart_historia = h1.selectbox("HEART Historia", ["", "0 pts - Baja sospecha", "1 pt - Moderada", "2 pts - Alta sospecha"], key=f"heart_historia_{rk}")
+        heart_ecg = h2.selectbox("HEART ECG", ["", "0 pts - Normal", "1 pt - Alteraciones inespecíficas", "2 pts - ST significativo"], key=f"heart_ecg_{rk}")
+        heart_riesgo = h3.selectbox("HEART Factores riesgo", ["", "0 pts - Sin factores", "1 pt - 1-2 factores", "2 pts - ≥3 factores o aterosclerosis"], key=f"heart_riesgo_{rk}")
+        heart_troponina = h4.selectbox("HEART Troponina", ["", "0 pts - Normal", "1 pt - 1-3x límite", "2 pts - >3x límite"], key=f"heart_troponina_{rk}")
 if is_ic:
     with st.expander("🫀 Insuficiencia Cardíaca", expanded=False):
         ic1, ic2, ic3 = st.columns(3)
@@ -202,6 +225,17 @@ if is_fa:
         diabetes = fa1.checkbox("Diabetes Mellitus (D - 1 pt)", key=f"diabetes_{rk}")
         stroke_fa = fa2.checkbox("ACV / TIA previo (S₂ - 2 pts)", key=f"stroke_fa_{rk}")
         vascular = fa2.checkbox("Enfermedad Vascular (V - 1 pt)", key=f"vascular_{rk}")
+
+        st.divider()
+        st.caption("HAS-BLED opcional para estimar riesgo hemorrágico. No contraindica anticoagulación: orienta corrección de factores modificables.")
+        hb1, hb2, hb3 = st.columns(3)
+        hasbled_hta_no_controlada = hb1.checkbox("HAS-BLED: HTA no controlada", key=f"hasbled_hta_{rk}")
+        hasbled_renal = hb1.checkbox("HAS-BLED: función renal alterada", key=f"hasbled_renal_{rk}")
+        hasbled_hepatica = hb1.checkbox("HAS-BLED: función hepática alterada", key=f"hasbled_hepatica_{rk}")
+        hasbled_sangrado = hb2.checkbox("HAS-BLED: sangrado previo/predisposición", key=f"hasbled_sangrado_{rk}")
+        hasbled_inr_labil = hb2.checkbox("HAS-BLED: INR lábil", key=f"hasbled_inr_{rk}")
+        hasbled_drogas = hb3.checkbox("HAS-BLED: fármacos predisponentes", key=f"hasbled_drogas_{rk}")
+        hasbled_alcohol = hb3.checkbox("HAS-BLED: alcohol", key=f"hasbled_alcohol_{rk}")
 
 st.divider()
 
@@ -568,6 +602,28 @@ datos_score = {
     "stroke_fa": stroke_fa,
     "vascular": vascular,
     "sexo_paciente": sexo_paciente,
+    "sat": sat,
+    "lactato": lactato,
+    "tropo": tropo,
+    "via_aerea": via_aerea,
+    "is_isquemia": is_isquemia,
+    "timi_riesgo_ge3": timi_riesgo_ge3,
+    "timi_cad": timi_cad,
+    "timi_aspirina": timi_aspirina,
+    "timi_angina": timi_angina,
+    "timi_st": timi_st,
+    "timi_marcadores": timi_marcadores,
+    "heart_historia": heart_historia,
+    "heart_ecg": heart_ecg,
+    "heart_riesgo": heart_riesgo,
+    "heart_troponina": heart_troponina,
+    "hasbled_hta_no_controlada": hasbled_hta_no_controlada,
+    "hasbled_renal": hasbled_renal,
+    "hasbled_hepatica": hasbled_hepatica,
+    "hasbled_sangrado": hasbled_sangrado,
+    "hasbled_inr_labil": hasbled_inr_labil,
+    "hasbled_drogas": hasbled_drogas,
+    "hasbled_alcohol": hasbled_alcohol,
 }
 
 auto_scores = calcular_scores_contexto(datos_score)
@@ -591,6 +647,52 @@ datos_validacion.update({
     "ecg_qtc": ecg_qtc,
 })
 alertas_seguridad = generar_validaciones_datos_criticos(datos_validacion, auto_scores)
+
+
+def mostrar_item_score(item, categoria, indice):
+    """Renderiza una tarjeta de score con origen, riesgo, faltantes y detalle desplegable."""
+    nombre = item.get("nombre", "Score")
+    valor = item.get("valor", "")
+    origen = item.get("origen", "")
+    nivel = item.get("nivel", "info")
+    interpretacion = item.get("interpretacion", "")
+    faltantes = item.get("faltantes_bloqueantes") or []
+
+    encabezado = f"**{nombre}:** `{valor}` · **Origen:** {origen}"
+    cuerpo = f"{encabezado}  \n{interpretacion}"
+
+    if nivel in ["critico"]:
+        st.error(cuerpo)
+    elif nivel in ["alto", "intermedio"]:
+        st.warning(cuerpo)
+    elif nivel == "bajo":
+        st.success(cuerpo)
+    elif nivel in ["bloqueado", "pendiente"]:
+        st.info(cuerpo)
+    else:
+        st.info(cuerpo)
+
+    if faltantes:
+        st.caption("Datos faltantes que bloquean interpretación: " + ", ".join(faltantes))
+
+    toggle_label = f"🔎 Ver cómo se calculó {nombre}"
+    key = f"detalle_score_{categoria}_{nombre}_{indice}_{rk}".replace(" ", "_").replace("/", "_")
+    ver_detalle = st.toggle(toggle_label, key=key) if hasattr(st, "toggle") else st.checkbox(toggle_label, key=key)
+    if ver_detalle:
+        detalle = item.get("detalle") or []
+        faltantes_generales = item.get("faltantes") or []
+        if detalle:
+            st.markdown("**Componentes usados:**")
+            for linea in detalle:
+                st.markdown(f"- {linea}")
+        else:
+            st.caption("Este score fue ingresado manualmente o no tiene componentes automáticos disponibles.")
+        if faltantes_generales:
+            st.markdown("**Datos faltantes:**")
+            for faltante in faltantes_generales:
+                st.markdown(f"- {faltante}")
+        if origen == "Manual":
+            st.caption("Origen manual: el sistema no recalculó este valor; verificar consistencia con la historia clínica.")
 
 
 with tab_planes:
@@ -627,8 +729,16 @@ with tab_planes:
         scores_globales = motor_scores(flags_scores, manuales_scores, auto_scores)
 
         if scores_globales:
-            texto_scores = formatear_scores_detectados(scores_globales)
-            st.info("**Scores Inteligentes Detectados:**\n\n" + "\n".join(texto_scores))
+            st.info("**Scores Inteligentes Detectados:** se distingue origen Manual/Auto, se bloquea interpretación si faltan datos críticos y se usa color por nivel de riesgo.")
+            for g_idx, grupo in enumerate(scores_globales):
+                st.markdown(f"#### {grupo.get('categoria', 'Scores')}")
+                items = grupo.get("items", [])
+                if items:
+                    for i_idx, item in enumerate(items):
+                        mostrar_item_score(item, grupo.get("categoria", "Scores"), i_idx)
+                else:
+                    texto_scores = formatear_scores_detectados([grupo])
+                    st.info("\n".join(texto_scores))
         else:
             st.caption("No se detectaron scores automáticos. Escriba diagnósticos clave arriba para activarlos (ej. Sepsis, IAM, FA).")
 
