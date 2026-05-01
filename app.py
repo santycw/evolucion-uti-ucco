@@ -10,6 +10,7 @@ from modules.infusiones import (
     texto_rango_infusion,
 )
 from modules.scores import calcular_scores_contexto, formatear_scores_detectados, motor_scores
+from modules.scores_catalog import agrupar_catalogo_por_categoria, resumen_estado_catalogo
 from modules.terminologia import cargar_diccionario_medico, detectar_en_db, normalizar_texto_medico
 from modules.validaciones import (
     calcular_par,
@@ -681,16 +682,36 @@ def mostrar_item_score(item, categoria, indice):
     if ver_detalle:
         detalle = item.get("detalle") or []
         faltantes_generales = item.get("faltantes") or []
+        catalogo = item.get("catalogo") or {}
+
+        if catalogo:
+            estado = str(catalogo.get("estado", "")).replace("_", " ")
+            st.markdown(f"**Biblioteca:** {catalogo.get('categoria', 'Sin categoría')} · **Estado:** {estado}")
+            if catalogo.get("uso_clinico"):
+                st.caption(catalogo.get("uso_clinico"))
+            requeridos = catalogo.get("inputs_requeridos") or []
+            if requeridos:
+                st.markdown("**Datos requeridos por el score:**")
+                st.markdown(" · ".join([f"`{x}`" for x in requeridos]))
+
         if detalle:
             st.markdown("**Componentes usados:**")
             for linea in detalle:
                 st.markdown(f"- {linea}")
         else:
             st.caption("Este score fue ingresado manualmente o no tiene componentes automáticos disponibles.")
+
         if faltantes_generales:
             st.markdown("**Datos faltantes:**")
             for faltante in faltantes_generales:
                 st.markdown(f"- {faltante}")
+
+        if catalogo.get("referencia"):
+            st.markdown("**Referencia base:**")
+            st.caption(catalogo.get("referencia"))
+        if catalogo.get("nota"):
+            st.markdown("**Nota institucional:**")
+            st.caption(catalogo.get("nota"))
         if origen == "Manual":
             st.caption("Origen manual: el sistema no recalculó este valor; verificar consistencia con la historia clínica.")
 
@@ -709,6 +730,35 @@ with tab_planes:
                     st.info(texto_alerta)
         else:
             st.success("Sin alertas críticas detectadas con los datos cargados.")
+
+    with st.container(border=True):
+        st.subheader("📚 Biblioteca institucional de scores")
+        with st.expander("Ver catálogo de scores disponibles / próximos a automatizar", expanded=False):
+            resumen = resumen_estado_catalogo()
+            st.caption(
+                "Catálogo inspirado en bibliotecas de calculadoras clínicas: muestra qué scores están implementados, "
+                "cuáles son manuales y cuáles quedan pendientes de automatización institucional."
+            )
+            st.markdown(
+                f"Implementados: **{resumen.get('implementado', 0)}** · "
+                f"Manuales: **{resumen.get('manual', 0)}** · "
+                f"Manual con automatización pendiente: **{resumen.get('manual_pendiente_auto', 0)}**"
+            )
+            grupos_catalogo = agrupar_catalogo_por_categoria()
+            categoria_catalogo = st.selectbox(
+                "Categoría",
+                list(grupos_catalogo.keys()),
+                key=f"catalogo_scores_categoria_{rk}",
+            )
+            for meta in grupos_catalogo.get(categoria_catalogo, []):
+                estado = str(meta.get("estado", "")).replace("_", " ")
+                st.markdown(f"**{meta.get('nombre')}** · `{estado}`")
+                st.caption(meta.get("uso_clinico", ""))
+                requeridos = meta.get("inputs_requeridos") or []
+                if requeridos:
+                    st.markdown("Datos requeridos: " + " · ".join([f"`{x}`" for x in requeridos]))
+                st.caption(f"Referencia: {meta.get('referencia', 'No consignada')}")
+                st.divider()
 
     with st.container(border=True):
         st.subheader("🛡️ FAST HUG BID")

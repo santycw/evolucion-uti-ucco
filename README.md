@@ -67,3 +67,21 @@ Se agregaron tres capas de seguridad sin cambiar el flujo general de la aplicaci
    - Si la dosis está fuera de rango, exige una confirmación adicional.
 
 > Los rangos son orientativos y deben ajustarse al protocolo institucional vigente antes de uso asistencial.
+
+## Cambios v2.0 motor de scores tipo biblioteca clínica
+
+Se incorporó `modules/scores_catalog.py` como catálogo institucional de scores:
+
+- centraliza categoría, estado de implementación, datos requeridos, uso clínico, referencia base y nota institucional;
+- permite mostrar en la app una biblioteca de scores disponibles y próximos a automatizar;
+- en cada score activo, el botón **“Ver cómo se calculó”** ahora muestra también datos requeridos, referencia y nota institucional;
+- mantiene bloqueo de interpretación cuando faltan datos críticos configurados en el catálogo;
+- distingue scores automáticos, manuales y pendientes de automatización.
+
+Estados usados:
+
+- `implementado`: cálculo automático disponible o integración activa completa;
+- `manual`: se registra manualmente porque requiere evaluación clínica directa o datos no estructurados;
+- `manual_pendiente_auto`: disponible como ingreso manual y planificado para automatización futura.
+
+> Las referencias del catálogo son orientativas para trazabilidad/auditoría. Validar fórmulas, puntos de corte e indicaciones con guías institucionales antes de uso clínico formal.

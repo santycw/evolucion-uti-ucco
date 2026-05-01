@@ -16,6 +16,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from .validaciones import p_num, calcular_tam_pp
+from .scores_catalog import obtener_metadata_score
 
 
 def _presente(valor: Any) -> bool:
@@ -988,11 +989,15 @@ def _crear_item(nombre: str, valor: Any, origen: str, auto: Dict[str, Any], deta
     detalle_key = detalle_key or nombre
     faltantes = list((auto.get("missing") or {}).get(detalle_key, []))
     detalle = list((auto.get("details") or {}).get(detalle_key, []))
+    catalogo = obtener_metadata_score(nombre)
+    bloquear = bool(catalogo.get("bloquear_si_faltan", True))
     if origen == "Manual":
         # El valor manual puede interpretarse, pero se informa que no fue calculado por el sistema.
         faltantes_visibles: List[str] = []
-    else:
+    elif bloquear:
         faltantes_visibles = faltantes
+    else:
+        faltantes_visibles = []
     nivel, interpretacion = evaluar_riesgo_score(nombre, valor, faltantes_visibles)
     return {
         "nombre": nombre,
@@ -1003,6 +1008,7 @@ def _crear_item(nombre: str, valor: Any, origen: str, auto: Dict[str, Any], deta
         "detalle": detalle,
         "nivel": nivel,
         "interpretacion": interpretacion,
+        "catalogo": catalogo,
     }
 
 
