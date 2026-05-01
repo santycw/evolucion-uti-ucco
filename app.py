@@ -360,7 +360,7 @@ with tab_clinica:
         if paciente_ventilado:
             via_aerea = r_b1.text_input("Vía Aérea", d_str("TOT"), key=f"va_{rk}")
         else:
-            via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Reservorio", "CAF", "VNI", "TQTAA"], key=f"va_{rk}")
+            via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Venturi 24%", "Máscara Venturi 28%", "Máscara Venturi 31%", "Máscara Venturi 35%", "Máscara Venturi 40%", "Máscara Venturi 50%", "Máscara Reservorio", "CAF", "VNI", "TQTAA"], key=f"va_{rk}")
 
         fio2 = r_b2.number_input("FiO2 (%)", 21, 100, 21, key=f"fio2_{rk}")
         pafi_manual = r_b3.text_input("PaFiO2 (Opcional)", key=f"pafi_man_{rk}")
