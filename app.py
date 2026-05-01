@@ -1,10 +1,23 @@
 import streamlit as st
 import datetime
 from modules.evolucion import generar_texto_evolucion
-from modules.infusiones import calcular_infusion_universal, obtener_diccionario_drogas
+from modules.infusiones import (
+    calcular_infusion_universal,
+    construir_detalle_infusion,
+    evaluar_rango_infusion,
+    obtener_diccionario_drogas,
+    requiere_confirmacion_extra,
+    texto_rango_infusion,
+)
 from modules.scores import calcular_scores_contexto, formatear_scores_detectados, motor_scores
 from modules.terminologia import cargar_diccionario_medico, detectar_en_db, normalizar_texto_medico
-from modules.validaciones import calcular_par, calcular_qtc_bazett, calcular_tam_pp
+from modules.validaciones import (
+    calcular_par,
+    calcular_qtc_bazett,
+    calcular_tam_pp,
+    formatear_alerta,
+    generar_validaciones_datos_criticos,
+)
 
 # --- INICIALIZACIÓN DE ESTADOS DE SESIÓN ---
 if 'rk' not in st.session_state:
@@ -211,8 +224,13 @@ with tab_clinica:
             dict_calc_drogas = obtener_diccionario_drogas()
 
             droga_sel = st.selectbox("Seleccione el fármaco y presentación:", list(dict_calc_drogas.keys()), key=f"droga_sel_{rk}")
-            unidad_activa = dict_calc_drogas[droga_sel]["unidad"]
-            mg_base = dict_calc_drogas[droga_sel]["mg"]
+            info_droga = dict_calc_drogas[droga_sel]
+            unidad_activa = info_droga["unidad"]
+            mg_base = info_droga["mg"]
+
+            st.caption(f"Rango orientativo configurado: **{texto_rango_infusion(info_droga)}**")
+            if info_droga.get("nota"):
+                st.caption(f"Nota de seguridad: {info_droga['nota']}")
 
             c_calc1, c_calc2 = st.columns(2)
             cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5, key=f"cant_amp_{rk}")
@@ -222,25 +240,66 @@ with tab_clinica:
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True, key=f"calc_modo_{rk}")
             nombre_limpio = droga_sel.split(" (")[0]
 
+            def mostrar_control_seguridad_infusion(dosis_resultado, velocidad_resultado, sufijo_key):
+                evaluacion = evaluar_rango_infusion(dosis_resultado, info_droga)
+                estado = evaluacion.get("estado")
+                mensaje = evaluacion.get("mensaje", "")
+
+                if estado == "ok":
+                    st.success(f"✅ {mensaje}")
+                elif estado == "critico":
+                    st.error(f"🚨 {mensaje}")
+                else:
+                    st.warning(f"⚠️ {mensaje}")
+
+                st.caption("Doble chequeo obligatorio antes de anexar drogas de alto riesgo a la evolución.")
+                chk_1 = st.checkbox(
+                    "Confirmo droga, presentación, dilución, unidad, peso y velocidad/dosis.",
+                    key=f"chk_inf_1_{sufijo_key}_{rk}",
+                )
+                chk_2 = st.checkbox(
+                    "Confirmo indicación médica/protocolo institucional y monitoreo correspondiente.",
+                    key=f"chk_inf_2_{sufijo_key}_{rk}",
+                )
+                chk_3 = True
+                if requiere_confirmacion_extra(evaluacion):
+                    chk_3 = st.checkbox(
+                        "Confirmo conscientemente que se anexará pese a alerta de rango o ausencia de rango.",
+                        key=f"chk_inf_3_{sufijo_key}_{rk}",
+                    )
+
+                habilitado = chk_1 and chk_2 and chk_3
+                detalle = construir_detalle_infusion(
+                    nombre_limpio,
+                    dosis_resultado,
+                    unidad_activa,
+                    velocidad_resultado,
+                    droga_mg,
+                    volumen_ml,
+                )
+
+                if st.button(f"➕ Anexar {nombre_limpio}", type="secondary", disabled=not habilitado, key=f"btn_anex_{sufijo_key}_{rk}"):
+                    if detalle not in st.session_state['infusiones_automatizadas']:
+                        st.session_state['infusiones_automatizadas'].append(detalle)
+                        rerun_app()
+
             if "DOSIS" in calc_modo:
                 vel_mlh = st.number_input("Velocidad en bomba (ml/h)", min_value=0.0, value=0.0, step=1.0, key=f"vel_mlh_{rk}")
                 if droga_mg > 0 and volumen_ml > 0:
                     dosis_calc = calcular_infusion_universal("DOSIS", droga_mg, volumen_ml, peso_paciente, vel_mlh, unidad_activa)
                     st.success(f"**Resultado:** {dosis_calc:.4f} {unidad_activa}")
-                    if st.button(f"➕ Anexar {nombre_limpio}", type="secondary", key=f"btn_anex_{rk}"):
-                        item = f"{nombre_limpio}: {dosis_calc:.4f} {unidad_activa}"
-                        if item not in st.session_state['infusiones_automatizadas']:
-                            st.session_state['infusiones_automatizadas'].append(item)
-                            rerun_app()
+                    mostrar_control_seguridad_infusion(dosis_calc, vel_mlh, "dosis")
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f", key=f"dosis_obj_{rk}")
                 if droga_mg > 0 and volumen_ml > 0:
                     vel_calc = calcular_infusion_universal("VELOCIDAD", droga_mg, volumen_ml, peso_paciente, dosis_obj, unidad_activa)
                     st.success(f"**Programar bomba a:** {vel_calc:.2f} ml/h")
+                    mostrar_control_seguridad_infusion(dosis_obj, vel_calc, "velocidad")
 
             if st.session_state['infusiones_automatizadas']:
                 st.caption("📋 **En memoria:**")
-                for inf in st.session_state['infusiones_automatizadas']: st.markdown(f"- `{inf}`")
+                for inf in st.session_state['infusiones_automatizadas']:
+                    st.markdown(f"- `{inf}`")
                 if st.button("🗑️ Borrar memoria", key=f"btn_del_mem_{rk}"):
                     st.session_state['infusiones_automatizadas'] = []
                     rerun_app()
@@ -522,7 +581,33 @@ pafi_final = auto_scores["pafi_final"]
 fc_n = auto_scores["fc_n"]
 pvc_n = auto_scores["pvc_n"]
 
+# --- VALIDACIÓN DE DATOS CRÍTICOS Y ALERTAS DE SEGURIDAD V2.0 ---
+datos_validacion = dict(datos_score)
+datos_validacion.update({
+    "sat": sat,
+    "gluc": gluc,
+    "hb": hb,
+    "lactato": lactato,
+    "ecg_qtc": ecg_qtc,
+})
+alertas_seguridad = generar_validaciones_datos_criticos(datos_validacion, auto_scores)
+
+
 with tab_planes:
+    with st.container(border=True):
+        st.subheader("🚨 Validación de datos críticos y alertas de seguridad")
+        if alertas_seguridad:
+            for alerta in alertas_seguridad:
+                texto_alerta = f"**{alerta.get('campo', 'Dato')}:** {formatear_alerta(alerta)}"
+                if alerta.get("nivel") == "critico":
+                    st.error(texto_alerta)
+                elif alerta.get("nivel") == "advertencia":
+                    st.warning(texto_alerta)
+                else:
+                    st.info(texto_alerta)
+        else:
+            st.success("Sin alertas críticas detectadas con los datos cargados.")
+
     with st.container(border=True):
         st.subheader("🛡️ FAST HUG BID")
         fast_dict = {
@@ -572,6 +657,7 @@ with tab_planes:
         scores_para_imprimir = motor_scores(flags_scores, manuales_scores, auto_scores)
         datos_evolucion = dict(locals())
         datos_evolucion["infusiones_automatizadas"] = st.session_state.get("infusiones_automatizadas", [])
+        datos_evolucion["alertas_seguridad"] = alertas_seguridad
 
         texto_final = generar_texto_evolucion(datos_evolucion, auto_scores, scores_para_imprimir)
 

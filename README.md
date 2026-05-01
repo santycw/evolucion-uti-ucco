@@ -45,3 +45,25 @@ git push
 ## Nota institucional
 
 No subir datos reales de pacientes al repositorio. Mantener credenciales, claves, configuraciones privadas y cualquier dato sensible fuera de GitHub.
+
+## Cambios v2.0 seguridad clínica
+
+Se agregaron tres capas de seguridad sin cambiar el flujo general de la aplicación:
+
+1. **Validación de datos críticos**
+   - TA mal formateada o fisiológicamente improbable.
+   - TAM baja, bradicardia/taquicardia, taquipnea, hipoxemia, fiebre/hipotermia.
+   - Alteraciones críticas de K, Na, glucemia, pH, lactato, PaFiO2, Hb, plaquetas, RIN y QTc.
+
+2. **Alertas de seguridad clínica**
+   - Panel visible en la pestaña Plan y FAST-HUG.
+   - Alertas categorizadas como crítico, advertencia o revisión.
+   - Las alertas se imprimen en la evolución final bajo el bloque “ALERTAS DE SEGURIDAD CLÍNICA”.
+
+3. **Calculadora de infusiones con rangos y doble chequeo**
+   - Cada droga tiene rango orientativo configurable en `modules/infusiones.py`.
+   - La app muestra si la dosis calculada está dentro, por debajo o por encima del rango configurado.
+   - Para anexar una infusión a la evolución, exige doble confirmación de droga, dilución, unidad, peso, indicación y monitoreo.
+   - Si la dosis está fuera de rango, exige una confirmación adicional.
+
+> Los rangos son orientativos y deben ajustarse al protocolo institucional vigente antes de uso asistencial.
