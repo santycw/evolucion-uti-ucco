@@ -1,5 +1,9 @@
 import streamlit as st
-import streamlit.components.v1 as components
+
+try:
+    from streamlit_image_coordinates import streamlit_image_coordinates
+except ImportError:
+    streamlit_image_coordinates = None
 import datetime
 from modules.evolucion import generar_texto_evolucion
 from modules.infusiones import (
@@ -31,36 +35,13 @@ from modules.upp import (
     PERILESIONAL_UPP,
     SUPERFICIES_APOYO,
     FRECUENCIAS_CAMBIO,
+    VISTAS_CORPORALES,
     calcular_braden,
+    crear_imagen_mapa_corporal,
+    referencias_mapa_corporal,
+    resumen_mapa_corporal,
+    zona_desde_coordenadas,
 )
-
-# Compatibilidad defensiva: evita que Streamlit falle si GitHub actualizó app.py
-# pero aún no desplegó el modules/upp.py nuevo con mapa corporal visual.
-try:
-    from modules.upp import (
-        VISTAS_CORPORALES,
-        limpiar_seleccion_svg,
-        render_svg_mapa_corporal,
-        resolver_seleccion_svg,
-        resumen_mapa_corporal,
-    )
-except ImportError:
-    VISTAS_CORPORALES = ["Anterior", "Posterior"]
-
-    def resumen_mapa_corporal():
-        return {
-            "Anterior": "Silueta anterior: cara, región malar, hombro/clavícula, tórax, pliegue submamario, abdomen, cresta ilíaca, periné, muslo, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
-            "Posterior": "Silueta posterior: occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
-        }
-
-    def resolver_seleccion_svg(vista, state_key):
-        return st.session_state.get(f"upp_svg_sel_{state_key}", "")
-
-    def limpiar_seleccion_svg(state_key):
-        st.session_state[f"upp_svg_sel_{state_key}"] = ""
-
-    def render_svg_mapa_corporal(vista, state_key, selected_zone=""):
-        return "<div style='padding:12px;border:1px solid #cbd5e1;border-radius:10px'>Mapa SVG no disponible: actualice también modules/upp.py.</div>"
 
 from modules.validaciones import (
     calcular_par,
@@ -91,15 +72,6 @@ def rerun_app():
     else:
         st.experimental_rerun()
 
-def render_html_seguro(html: str, height: int = 820):
-    """Renderiza HTML/SVG real dentro de un componente HTML de Streamlit."""
-    components.html(html, height=height, scrolling=True)
-
-
-rk = st.session_state['rk']
-
-# --- MÓDULOS V2.0: infusiones, terminología, validaciones, scores y evolución ---
-# Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
 # --- CSS PERSONALIZADO ---
@@ -634,8 +606,8 @@ with tab_piel:
                 st.markdown(f"- **{componente}:** {valor} pts")
 
     with st.container(border=True):
-        st.subheader("🗺️ Mapa corporal SVG interactivo de lesiones por presión / piel")
-        st.caption("Seleccione la vista corporal y haga clic directamente sobre la silueta anterior/posterior para asignar la localización de cada lesión. La zona elegida se resaltará y se volcará en la evolución final.")
+        st.subheader("🗺️ Mapa corporal anterior/posterior clickeable de lesiones por presión / piel")
+        st.caption("Seleccione la vista corporal y haga clic sobre los puntos numerados de la silueta. La zona elegida se resaltará y se volcará en la evolución final.")
 
         mapa_resumen = resumen_mapa_corporal()
         mp1, mp2 = st.columns(2)
@@ -662,19 +634,47 @@ with tab_piel:
                 vista = l1.selectbox("Vista corporal", VISTAS_CORPORALES, key=f"upp_vista_{idx}_{rk}")
                 lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
 
-                svg_slot_key = f"{idx}_{rk}"
-                localizacion = resolver_seleccion_svg(vista, svg_slot_key)
-                render_html_seguro(render_svg_mapa_corporal(vista, svg_slot_key, localizacion))
-                info1, info2 = st.columns([5,1])
+                mapa_state_key = f"upp_mapa_sel_{idx}_{rk}"
+                localizacion = st.session_state.get(mapa_state_key, "")
+
+                imagen_mapa = crear_imagen_mapa_corporal(vista, selected_zone=localizacion)
+
+                if streamlit_image_coordinates is not None:
+                    click_mapa = streamlit_image_coordinates(
+                        imagen_mapa,
+                        key=f"upp_mapa_coords_{idx}_{rk}",
+                        width=360,
+                    )
+                    if click_mapa and isinstance(click_mapa, dict):
+                        zona_click = zona_desde_coordenadas(vista, click_mapa.get("x"), click_mapa.get("y"))
+                        if zona_click and zona_click != localizacion:
+                            st.session_state[mapa_state_key] = zona_click
+                            st.rerun()
+                else:
+                    st.error("Falta instalar `streamlit-image-coordinates`. Revise requirements.txt y reinicie Streamlit.")
+                    zona_fallback = st.selectbox(
+                        "Zona anatómica del mapa",
+                        [""] + referencias_mapa_corporal(vista),
+                        key=f"upp_mapa_fallback_{idx}_{rk}",
+                    )
+                    if zona_fallback and zona_fallback != localizacion:
+                        st.session_state[mapa_state_key] = zona_fallback
+                        st.rerun()
+
+                info1, info2 = st.columns([5, 1])
                 with info1:
                     if localizacion:
                         st.success(f"Zona anatómica seleccionada: {localizacion}")
                     else:
-                        st.warning("Seleccione una zona anatómica haciendo clic sobre la silueta SVG interactiva.")
+                        st.warning("Seleccione una zona anatómica haciendo clic sobre los puntos numerados del mapa corporal.")
                 with info2:
                     if st.button("Limpiar zona", key=f"upp_clear_zone_{idx}_{rk}"):
-                        limpiar_seleccion_svg(svg_slot_key)
+                        st.session_state[mapa_state_key] = ""
                         st.rerun()
+
+                with st.expander("Ver referencias anatómicas del mapa", expanded=False):
+                    for zona_ref in referencias_mapa_corporal(vista):
+                        st.markdown(f"- {zona_ref}")
 
                 estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
                 detalle_topografico = st.text_input(

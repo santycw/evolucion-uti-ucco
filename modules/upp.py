@@ -1,21 +1,19 @@
 """
 Módulo UPP / decúbito / Braden.
 
-Incluye cálculo de Braden, mapa corporal SVG interactivo (anterior/posterior)
-y formateo del bloque de piel / UPP para la evolución final.
+Incluye cálculo de Braden, mapa corporal anterior/posterior clickeable por
+coordenadas de imagen y formateo del bloque de piel / UPP para la evolución final.
 """
 
 from __future__ import annotations
 
-import html
+import math
 import re
 from typing import Any
-from urllib.parse import urlencode
 
-import streamlit as st
+from PIL import Image, ImageDraw, ImageFont
 
 
-# --- MAPA CORPORAL SVG INTERACTIVO ---
 VISTAS_CORPORALES = ["Anterior", "Posterior"]
 
 MAPA_CORPORAL = {
@@ -55,17 +53,41 @@ MAPA_CORPORAL = {
     ],
 }
 
-# Posiciones de hotspots sobre la silueta simplificada
+# Coordenadas sobre la imagen generada por crear_imagen_mapa_corporal().
 _HOTSPOTS = {
     "Anterior": {
-        1:(160,48), 2:(205,72), 3:(94,114), 4:(160,135), 5:(160,171), 6:(160,214),
-        7:(160,258), 8:(160,300), 9:(138,356), 10:(138,442), 11:(138,515), 12:(138,572),
-        13:(138,635), 14:(138,675), 15:(252,706),
+        1: (160, 54),
+        2: (207, 82),
+        3: (96, 128),
+        4: (160, 150),
+        5: (160, 190),
+        6: (160, 238),
+        7: (160, 286),
+        8: (160, 334),
+        9: (136, 392),
+        10: (136, 480),
+        11: (136, 555),
+        12: (136, 620),
+        13: (136, 684),
+        14: (136, 724),
+        15: (260, 724),
     },
     "Posterior": {
-        1:(160,48), 2:(205,72), 3:(96,116), 4:(160,150), 5:(87,220), 6:(160,274),
-        7:(160,317), 8:(160,356), 9:(232,346), 10:(138,414), 11:(138,486), 12:(138,548),
-        13:(138,646), 14:(138,685), 15:(252,706),
+        1: (160, 54),
+        2: (207, 82),
+        3: (96, 128),
+        4: (160, 166),
+        5: (86, 244),
+        6: (160, 306),
+        7: (160, 352),
+        8: (160, 394),
+        9: (232, 384),
+        10: (136, 456),
+        11: (136, 532),
+        12: (136, 598),
+        13: (136, 700),
+        14: (136, 736),
+        15: (260, 724),
     },
 }
 
@@ -151,7 +173,7 @@ def obtener_zonas_mapa(vista: Any) -> list[str]:
     return [""] + zonas if zonas else [""]
 
 
-def _extraer_numero_zona(zona: str) -> int | None:
+def _extraer_numero_zona(zona: Any) -> int | None:
     match = re.match(r"\s*(\d+)", str(zona or ""))
     return int(match.group(1)) if match else None
 
@@ -162,110 +184,115 @@ def _texto_zona_sin_numero(zona: str) -> str:
 
 def resumen_mapa_corporal() -> dict[str, str]:
     return {
-        "Anterior": "Silueta anterior: cara, región malar, hombro/clavícula, tórax, pliegue submamario, abdomen, cresta ilíaca, periné, muslo, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
-        "Posterior": "Silueta posterior: occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
+        "Anterior": "Haga clic en los puntos numerados de la silueta anterior para seleccionar la localización.",
+        "Posterior": "Haga clic en los puntos numerados de la silueta posterior para seleccionar la localización.",
     }
 
 
-def _build_pick_url(vista: str, zona: str, state_key: str) -> str:
-    params = dict(st.query_params)
-    params["upp_pick_slot"] = state_key
-    params["upp_pick_view"] = vista
-    params["upp_pick_zone"] = zona
-    return "?" + urlencode(params, doseq=False)
+def _get_font(size: int = 15):
+    try:
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", size=size)
+    except Exception:
+        return ImageFont.load_default()
 
 
-def _svg_hotspot(vista: str, zona: str, state_key: str, selected: bool) -> str:
-    numero = _extraer_numero_zona(zona) or 0
-    cx, cy = _HOTSPOTS[vista][numero]
-    fill = "#ef4444" if selected else "#f59e0b"
-    stroke = "#7f1d1d" if selected else "#1f2937"
-    text_fill = "#ffffff" if selected else "#111827"
-    title = html.escape(_texto_zona_sin_numero(zona))
-    href = html.escape(_build_pick_url(vista, zona, state_key), quote=True)
-    return (
-        f"<a href='{href}' target='_top'>"
-        f"<title>{title}</title>"
-        f"<circle cx='{cx}' cy='{cy}' r='16' fill='{fill}' stroke='{stroke}' stroke-width='2'/>"
-        f"<text x='{cx}' y='{cy + 5}' text-anchor='middle' font-family='Arial' font-size='14' font-weight='700' fill='{text_fill}'>{numero}</text>"
-        f"</a>"
-    )
+def _draw_centered_text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, font, fill):
+    try:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+    except Exception:
+        w, h = draw.textlength(text, font=font), 12
+    draw.text((xy[0] - w / 2, xy[1] - h / 2 - 1), text, font=font, fill=fill)
 
 
-def _svg_body_base() -> str:
-    return """
-        <circle cx='160' cy='58' r='36' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='144' y='92' width='32' height='22' rx='10' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='110' y='116' width='100' height='168' rx='42' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='122' y='284' width='76' height='98' rx='28' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='80' y='126' width='24' height='124' rx='12' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='216' y='126' width='24' height='124' rx='12' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='74' y='245' width='22' height='112' rx='11' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='224' y='245' width='22' height='112' rx='11' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='118' y='380' width='28' height='148' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='174' y='380' width='28' height='148' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='118' y='528' width='28' height='128' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <rect x='174' y='528' width='28' height='128' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <ellipse cx='132' cy='678' rx='28' ry='15' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-        <ellipse cx='188' cy='678' rx='28' ry='15' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
-    """
+def _draw_body_base(draw: ImageDraw.ImageDraw):
+    outline = "#475569"
+    fill = "#d1d5db"
+    # Cabeza y cuello
+    draw.ellipse((124, 24, 196, 96), fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((144, 94, 176, 118), radius=10, fill=fill, outline=outline, width=3)
+    # Tronco/pelvis
+    draw.rounded_rectangle((108, 118, 212, 300), radius=42, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((120, 296, 200, 400), radius=28, fill=fill, outline=outline, width=3)
+    # Brazos
+    draw.rounded_rectangle((78, 128, 104, 260), radius=13, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((216, 128, 242, 260), radius=13, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((70, 254, 96, 374), radius=13, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((224, 254, 250, 374), radius=13, fill=fill, outline=outline, width=3)
+    # Piernas
+    draw.rounded_rectangle((116, 398, 148, 558), radius=15, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((172, 398, 204, 558), radius=15, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((116, 558, 148, 698), radius=15, fill=fill, outline=outline, width=3)
+    draw.rounded_rectangle((172, 558, 204, 698), radius=15, fill=fill, outline=outline, width=3)
+    # Pies
+    draw.ellipse((104, 696, 160, 730), fill=fill, outline=outline, width=3)
+    draw.ellipse((160, 696, 216, 730), fill=fill, outline=outline, width=3)
 
 
-def render_svg_mapa_corporal(vista: str, state_key: str, selected_zone: str = "") -> str:
-    """Devuelve HTML/SVG interactivo real con zonas clickeables sobre una silueta."""
+def crear_imagen_mapa_corporal(vista: str, selected_zone: str = "") -> Image.Image:
+    """Crea una imagen PIL con silueta corporal y puntos clickeables."""
     vista = vista if vista in VISTAS_CORPORALES else "Anterior"
-    selected_zone = s(selected_zone)
-    hotspots = "".join(
-        _svg_hotspot(vista, zona, state_key, zona == selected_zone)
-        for zona in MAPA_CORPORAL.get(vista, [])
-    )
-    leyenda = "".join(
-        f"<li><b>{_extraer_numero_zona(z) or ''}</b>: {html.escape(_texto_zona_sin_numero(z))}</li>"
-        for z in MAPA_CORPORAL.get(vista, [])
-    )
-    titulo = f"Silueta corporal {vista.lower()} clickeable"
-    return f"""
-    <div style='border:1px solid #334155;border-radius:14px;background:#0f172a;padding:12px;margin:4px 0 10px 0;'>
-      <div style='color:#f8fafc;font-weight:700;font-size:15px;margin-bottom:4px'>{titulo}</div>
-      <div style='color:#cbd5e1;font-size:12px;margin-bottom:10px'>Haga clic sobre una zona numerada para seleccionar la localización anatómica de la lesión.</div>
-      <div style='display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;'>
-        <div style='background:#e5e7eb;border-radius:14px;padding:8px;'>
-          <svg width='320' height='730' viewBox='0 0 320 730' xmlns='http://www.w3.org/2000/svg'>
-            {_svg_body_base()}
-            {hotspots}
-          </svg>
-        </div>
-        <div style='flex:1;min-width:240px;background:#ffffff;border-radius:12px;padding:12px;border:1px solid #cbd5e1;color:#111827;'>
-          <div style='font-weight:700;margin-bottom:8px'>Referencias anatómicas</div>
-          <ul style='margin:0;padding-left:18px;font-size:13px;line-height:1.35;list-style:none'>{leyenda}</ul>
-          <div style='margin-top:10px;font-size:12px;color:#475569'>La zona seleccionada se resalta en rojo.</div>
-        </div>
-      </div>
-    </div>
-    """
+    img = Image.new("RGB", (360, 790), "#0f172a")
+    draw = ImageDraw.Draw(img)
+    font_title = _get_font(18)
+    font_small = _get_font(12)
+    font_marker = _get_font(15)
+
+    draw.text((18, 14), f"Mapa corporal {vista.lower()} clickeable", fill="#f8fafc", font=font_title)
+    draw.text((18, 42), "Haga clic sobre un punto numerado para seleccionar la localización.", fill="#cbd5e1", font=font_small)
+
+    # Panel de silueta
+    draw.rounded_rectangle((20, 70, 340, 770), radius=16, fill="#e5e7eb", outline="#334155", width=2)
+    _draw_body_base(draw)
+
+    selected_num = _extraer_numero_zona(selected_zone)
+    zonas = MAPA_CORPORAL.get(vista, [])
+    for zona in zonas:
+        numero = _extraer_numero_zona(zona)
+        if numero is None:
+            continue
+        cx, cy = _HOTSPOTS[vista][numero]
+        selected = numero == selected_num
+        marker_fill = "#ef4444" if selected else "#f59e0b"
+        marker_outline = "#7f1d1d" if selected else "#111827"
+        text_fill = "#ffffff" if selected else "#111827"
+        r = 18 if selected else 16
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=marker_fill, outline=marker_outline, width=3)
+        _draw_centered_text(draw, (cx, cy), str(numero), font_marker, text_fill)
+
+    return img
 
 
-def resolver_seleccion_svg(vista: str, state_key: str) -> str:
-    """Consume los query params del mapa SVG y guarda la selección en session_state."""
-    estado_key = f"upp_svg_sel_{state_key}"
-    seleccion = s(st.session_state.get(estado_key, ""))
-    q_slot = s(st.query_params.get("upp_pick_slot", ""))
-    q_view = s(st.query_params.get("upp_pick_view", ""))
-    q_zone = s(st.query_params.get("upp_pick_zone", ""))
+def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 28) -> str:
+    """Convierte un clic en coordenadas de imagen a la zona anatómica más cercana."""
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+    try:
+        x_f = float(x)
+        y_f = float(y)
+    except Exception:
+        return ""
 
-    if q_slot == state_key and q_view == vista and q_zone in MAPA_CORPORAL.get(vista, []):
-        st.session_state[estado_key] = q_zone
-        seleccion = q_zone
+    mejor_num = None
+    mejor_dist = 10**9
+    for numero, (cx, cy) in _HOTSPOTS.get(vista, {}).items():
+        dist = math.sqrt((x_f - cx) ** 2 + (y_f - cy) ** 2)
+        if dist < mejor_dist:
+            mejor_dist = dist
+            mejor_num = numero
 
-    if seleccion and seleccion not in MAPA_CORPORAL.get(vista, []):
-        seleccion = ""
-        st.session_state[estado_key] = ""
+    if mejor_num is None or mejor_dist > radio_px:
+        return ""
 
-    return seleccion
+    for zona in MAPA_CORPORAL.get(vista, []):
+        if _extraer_numero_zona(zona) == mejor_num:
+            return zona
+    return ""
 
 
-def limpiar_seleccion_svg(state_key: str) -> None:
-    st.session_state[f"upp_svg_sel_{state_key}"] = ""
+def referencias_mapa_corporal(vista: str) -> list[str]:
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+    return MAPA_CORPORAL.get(vista, [])
 
 
 def puntaje_desde_opcion(opcion: Any) -> int:
@@ -287,7 +314,14 @@ def interpretar_braden(puntaje: int | None) -> dict:
     return {"riesgo": "Sin riesgo significativo", "nivel": "muy_bajo", "detalle": "Continuar vigilancia clínica habitual."}
 
 
-def calcular_braden(percepcion: Any, humedad: Any, actividad: Any, movilidad: Any, nutricion: Any, friccion: Any) -> dict:
+def calcular_braden(
+    percepcion: Any,
+    humedad: Any,
+    actividad: Any,
+    movilidad: Any,
+    nutricion: Any,
+    friccion: Any,
+) -> dict:
     componentes = {
         "Percepción sensorial": puntaje_desde_opcion(percepcion),
         "Humedad": puntaje_desde_opcion(humedad),
@@ -332,7 +366,11 @@ def formatear_lesion_upp(lesion: dict, indice: int) -> str:
         encabezado.append(estadio)
 
     detalle = []
-    dimensiones = formatear_dimensiones(lesion.get("largo_cm"), lesion.get("ancho_cm"), lesion.get("profundidad_cm"))
+    dimensiones = formatear_dimensiones(
+        lesion.get("largo_cm"),
+        lesion.get("ancho_cm"),
+        lesion.get("profundidad_cm"),
+    )
     if dimensiones:
         detalle.append(dimensiones)
 
