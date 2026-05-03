@@ -30,11 +30,103 @@ from modules.upp import (
     PERILESIONAL_UPP,
     SUPERFICIES_APOYO,
     FRECUENCIAS_CAMBIO,
-    VISTAS_CORPORALES,
     calcular_braden,
-    obtener_zonas_mapa,
-    resumen_mapa_corporal,
 )
+
+# Compatibilidad defensiva: evita que Streamlit falle si GitHub actualizó app.py
+# pero aún no desplegó el modules/upp.py nuevo con mapa corporal.
+try:
+    from modules.upp import VISTAS_CORPORALES, obtener_zonas_mapa, resumen_mapa_corporal
+except ImportError:
+    VISTAS_CORPORALES = [
+        "Anterior",
+        "Posterior",
+        "Lateral derecha",
+        "Lateral izquierda",
+        "Cabeza / cara / dispositivos",
+    ]
+
+    _MAPA_CORPORAL_FALLBACK = {
+        "Anterior": [
+            "",
+            "Frente",
+            "Mentón",
+            "Tórax anterior",
+            "Mamas / pliegue submamario",
+            "Abdomen",
+            "Cresta ilíaca anterior",
+            "Rodilla",
+            "Tibia / cara anterior pierna",
+            "Dorso del pie",
+            "Dedos del pie",
+            "Otra localización",
+        ],
+        "Posterior": [
+            "",
+            "Occipital",
+            "Pabellón auricular",
+            "Escápula",
+            "Columna dorsal",
+            "Codo",
+            "Sacro",
+            "Cóccix",
+            "Glúteo",
+            "Isquion",
+            "Hueco poplíteo",
+            "Gemelos / pantorrilla",
+            "Talón",
+            "Planta del pie",
+            "Otra localización",
+        ],
+        "Lateral derecha": [
+            "",
+            "Hombro derecho",
+            "Costado torácico derecho",
+            "Trocánter derecho",
+            "Muslo lateral derecho",
+            "Rodilla lateral derecha",
+            "Maléolo externo derecho",
+            "Pie / borde externo derecho",
+            "Otra localización",
+        ],
+        "Lateral izquierda": [
+            "",
+            "Hombro izquierdo",
+            "Costado torácico izquierdo",
+            "Trocánter izquierdo",
+            "Muslo lateral izquierdo",
+            "Rodilla lateral izquierda",
+            "Maléolo externo izquierdo",
+            "Pie / borde externo izquierdo",
+            "Otra localización",
+        ],
+        "Cabeza / cara / dispositivos": [
+            "",
+            "Nariz / puente nasal",
+            "Labio / comisura",
+            "Mejilla",
+            "Cuero cabelludo",
+            "Cuello",
+            "Traqueostomía",
+            "Zona de máscara / VNI",
+            "Zona de tubo / fijación",
+            "Zona de CNG / SNG",
+            "Zona de catéter / dispositivo médico",
+            "Otra localización",
+        ],
+    }
+
+    def obtener_zonas_mapa(vista):
+        return _MAPA_CORPORAL_FALLBACK.get(str(vista or ""), [""])
+
+    def resumen_mapa_corporal():
+        return {
+            "Anterior": "Frente, mentón, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, rodilla, tibia, dorso del pie, dedos.",
+            "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro, cóccix, glúteo, isquion, hueco poplíteo, gemelos, talón, planta.",
+            "Lateral derecha": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
+            "Lateral izquierda": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
+            "Cabeza / cara / dispositivos": "Nariz, labio, mejilla, cuero cabelludo, cuello, traqueostomía y zonas asociadas a dispositivos.",
+        }
 from modules.validaciones import (
     calcular_par,
     calcular_qtc_bazett,
