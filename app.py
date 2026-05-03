@@ -353,11 +353,48 @@ with tab_clinica:
                     rerun_app()
 
         st.caption("Invasiones / Accesos")
-        d1, d2, d3, d4 = st.columns(4)
-        cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
-        ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
-        sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+        d1, d2, d3, d4, d5 = st.columns([1.35, 1.0, 1.0, 1.0, 1.0])
+
+        cvc_tipo = d1.selectbox(
+            "Tipo de CVC",
+            [
+                "",
+                "CVC convencional",
+                "CVC bilumen",
+                "CVC trilumen",
+                "PICC",
+                "Introductor venoso central",
+                "Catéter de hemodiálisis / Shaldon",
+                "Port-a-cath",
+                "Swan-Ganz",
+                "Otro CVC",
+            ],
+            key=f"cvc_tipo_{rk}",
+            help="Seleccione únicamente si el paciente tiene CVC colocado.",
+        )
+
+        cvc_fecha = None
+        cvc_dias_auto = ""
+        cvc_info = ""
+
+        if cvc_tipo:
+            cvc_fecha = d2.date_input(
+                "Fecha CVC",
+                value=hoy,
+                max_value=hoy,
+                format="DD/MM/YYYY",
+                key=f"cvc_fecha_{rk}",
+            )
+            cvc_dias_n = max((hoy - cvc_fecha).days + 1, 1)
+            cvc_dias_auto = f"Día {cvc_dias_n}"
+            d2.caption(f"{cvc_dias_auto} de CVC")
+            cvc_info = f"{cvc_tipo}, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+        else:
+            d2.caption("Sin CVC consignado")
+
+        ca_info = d3.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
+        sv_dias = d4.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = d5.text_input("SNG (Día)", key=f"sng_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -387,12 +424,55 @@ with tab_clinica:
     with st.container(border=True):
         st.subheader("2. Respiratorio y ARM")
         r_b1, r_b2, r_b3 = st.columns(3)
+        FIO2_AUTOMATICA_DISPOSITIVO = {
+            "Máscara Venturi 24%": 24,
+            "Máscara Venturi 28%": 28,
+            "Máscara Venturi 31%": 31,
+            "Máscara Venturi 35%": 35,
+            "Máscara Venturi 40%": 40,
+            "Máscara Venturi 50%": 50,
+        }
+
         if paciente_ventilado:
             via_aerea = r_b1.text_input("Vía Aérea", d_str("TOT"), key=f"va_{rk}")
         else:
-            via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Venturi 24%", "Máscara Venturi 28%", "Máscara Venturi 31%", "Máscara Venturi 35%", "Máscara Venturi 40%", "Máscara Venturi 50%", "Máscara Reservorio", "CAF", "VNI", "TQTAA"], key=f"va_{rk}")
+            via_aerea = r_b1.selectbox(
+                "Dispositivo O2",
+                [
+                    "AA (Aire Ambiente)",
+                    "Cánula Nasal",
+                    "Máscara Venturi 24%",
+                    "Máscara Venturi 28%",
+                    "Máscara Venturi 31%",
+                    "Máscara Venturi 35%",
+                    "Máscara Venturi 40%",
+                    "Máscara Venturi 50%",
+                    "Máscara Reservorio",
+                    "CAF",
+                    "VNI",
+                    "TQTAA",
+                ],
+                key=f"va_{rk}",
+            )
 
-        fio2 = r_b2.number_input("FiO2 (%)", 21, 100, 21, key=f"fio2_{rk}")
+        fio2_key = f"fio2_{rk}"
+        fio2_auto = FIO2_AUTOMATICA_DISPOSITIVO.get(via_aerea)
+        if fio2_auto is not None:
+            st.session_state[fio2_key] = fio2_auto
+        elif fio2_key not in st.session_state:
+            st.session_state[fio2_key] = 21
+
+        fio2 = r_b2.number_input(
+            "FiO2 (%)",
+            21,
+            100,
+            key=fio2_key,
+            disabled=fio2_auto is not None,
+            help="En máscaras Venturi se completa automáticamente según el dispositivo seleccionado.",
+        )
+        if fio2_auto is not None:
+            r_b2.caption(f"FiO₂ automática por {via_aerea}: {fio2_auto}%")
+
         pafi_manual = r_b3.text_input("PaFiO2 (Opcional)", key=f"pafi_man_{rk}")
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
