@@ -26,12 +26,14 @@ from modules.upp import (
     INFECCION_UPP,
     LATERALIDADES_UPP,
     LECHOS_UPP,
-    LOCALIZACIONES_UPP,
     MEDIDAS_PREVENCION,
     PERILESIONAL_UPP,
     SUPERFICIES_APOYO,
     FRECUENCIAS_CAMBIO,
+    VISTAS_CORPORALES,
     calcular_braden,
+    obtener_zonas_mapa,
+    resumen_mapa_corporal,
 )
 from modules.validaciones import (
     calcular_par,
@@ -600,7 +602,24 @@ with tab_piel:
                 st.markdown(f"- **{componente}:** {valor} pts")
 
     with st.container(border=True):
-        st.subheader("📍 Lesiones por presión / piel")
+        st.subheader("🗺️ Mapa corporal de lesiones por presión / piel")
+        st.caption("Seleccione la vista corporal y luego la zona anatómica del mapa para cada lesión. Esto se volcará automáticamente en la evolución final.")
+
+        mapa_resumen = resumen_mapa_corporal()
+        mp1, mp2 = st.columns(2)
+        with mp1:
+            st.markdown("**Vista anterior**")
+            st.caption(mapa_resumen.get("Anterior", ""))
+            st.markdown("**Vista lateral derecha**")
+            st.caption(mapa_resumen.get("Lateral derecha", ""))
+            st.markdown("**Vista lateral izquierda**")
+            st.caption(mapa_resumen.get("Lateral izquierda", ""))
+        with mp2:
+            st.markdown("**Vista posterior**")
+            st.caption(mapa_resumen.get("Posterior", ""))
+            st.markdown("**Cabeza / cara / dispositivos**")
+            st.caption(mapa_resumen.get("Cabeza / cara / dispositivos", ""))
+
         cantidad_lesiones_upp = st.number_input(
             "Cantidad de lesiones a registrar",
             min_value=0,
@@ -614,9 +633,17 @@ with tab_piel:
         for idx in range(int(cantidad_lesiones_upp)):
             with st.expander(f"Lesión {idx + 1}", expanded=True):
                 l1, l2, l3 = st.columns(3)
-                localizacion = l1.selectbox("Localización", LOCALIZACIONES_UPP, key=f"upp_loc_{idx}_{rk}")
-                lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
-                estadio = l3.selectbox("Estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
+                vista = l1.selectbox("Vista corporal", VISTAS_CORPORALES, key=f"upp_vista_{idx}_{rk}")
+                zonas_vista = obtener_zonas_mapa(vista)
+                localizacion = l2.selectbox("Zona anatómica del mapa", zonas_vista, key=f"upp_loc_{idx}_{rk}")
+                lateralidad = l3.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
+
+                estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
+                detalle_topografico = st.text_input(
+                    "Detalle anatómico adicional (opcional)",
+                    placeholder="Ej: paramediana sacra derecha, región trocantérica posterior, borde externo del talón...",
+                    key=f"upp_detalle_topografico_{idx}_{rk}",
+                )
 
                 m1, m2, m3 = st.columns(3)
                 largo_cm = m1.text_input("Largo (cm)", key=f"upp_largo_{idx}_{rk}")
@@ -624,7 +651,7 @@ with tab_piel:
                 profundidad_cm = m3.text_input("Profundidad (cm)", key=f"upp_prof_{idx}_{rk}")
 
                 c1, c2, c3 = st.columns(3)
-                lecho = c1.selectbox("Lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
+                lecho = c1.selectbox("Características del lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
                 exudado = c2.selectbox("Exudado", EXUDADOS_UPP, key=f"upp_exudado_{idx}_{rk}")
                 perilesional = c3.selectbox("Piel perilesional", PERILESIONAL_UPP, key=f"upp_perilesional_{idx}_{rk}")
 
@@ -632,12 +659,14 @@ with tab_piel:
                 infeccion = c4.selectbox("Signos de infección", INFECCION_UPP, key=f"upp_infeccion_{idx}_{rk}")
                 dolor = c5.selectbox("Dolor", DOLOR_UPP, key=f"upp_dolor_{idx}_{rk}")
 
-                observaciones = st.text_area("Observaciones", height=68, key=f"upp_obs_{idx}_{rk}")
+                observaciones = st.text_area("Observaciones / características adicionales", height=68, key=f"upp_obs_{idx}_{rk}")
                 conducta = st.text_area("Conducta / curación indicada", height=68, key=f"upp_cond_{idx}_{rk}")
 
                 upp_lesiones.append({
+                    "vista": vista,
                     "localizacion": localizacion,
                     "lateralidad": lateralidad,
+                    "detalle_topografico": detalle_topografico,
                     "estadio": estadio,
                     "largo_cm": largo_cm,
                     "ancho_cm": ancho_cm,

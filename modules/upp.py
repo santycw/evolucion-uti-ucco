@@ -8,32 +8,84 @@ mantener app.py como interfaz y preservar la generación estructurada.
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+from typing import Any
 
 
-LOCALIZACIONES_UPP = [
-    "",
-    "Occipital",
-    "Pabellón auricular",
-    "Escápula",
-    "Columna dorsal",
-    "Sacro",
-    "Cóccix",
-    "Glúteo",
-    "Trocánter",
-    "Isquion",
-    "Codo",
-    "Rodilla",
-    "Maléolo",
-    "Talón",
-    "Pie / borde externo",
-    "Dedos del pie",
-    "Nariz / puente nasal",
-    "Labio / comisura",
-    "Zona de dispositivo médico",
-    "Otra",
+# --- MAPA CORPORAL SIMPLE ---
+VISTAS_CORPORALES = [
+    "Anterior",
+    "Posterior",
+    "Lateral derecha",
+    "Lateral izquierda",
+    "Cabeza / cara / dispositivos",
 ]
 
+MAPA_CORPORAL = {
+    "Anterior": [
+        "Frente",
+        "Mentón",
+        "Tórax anterior",
+        "Mamas / pliegue submamario",
+        "Abdomen",
+        "Cresta ilíaca anterior",
+        "Rodilla",
+        "Tibia / cara anterior pierna",
+        "Dorso del pie",
+        "Dedos del pie",
+        "Otra localización",
+    ],
+    "Posterior": [
+        "Occipital",
+        "Pabellón auricular",
+        "Escápula",
+        "Columna dorsal",
+        "Codo",
+        "Sacro",
+        "Cóccix",
+        "Glúteo",
+        "Isquion",
+        "Hueco poplíteo",
+        "Gemelos / pantorrilla",
+        "Talón",
+        "Planta del pie",
+        "Otra localización",
+    ],
+    "Lateral derecha": [
+        "Hombro derecho",
+        "Costado torácico derecho",
+        "Trocánter derecho",
+        "Muslo lateral derecho",
+        "Rodilla lateral derecha",
+        "Maléolo externo derecho",
+        "Pie / borde externo derecho",
+        "Otra localización",
+    ],
+    "Lateral izquierda": [
+        "Hombro izquierdo",
+        "Costado torácico izquierdo",
+        "Trocánter izquierdo",
+        "Muslo lateral izquierdo",
+        "Rodilla lateral izquierda",
+        "Maléolo externo izquierdo",
+        "Pie / borde externo izquierdo",
+        "Otra localización",
+    ],
+    "Cabeza / cara / dispositivos": [
+        "Nariz / puente nasal",
+        "Labio / comisura",
+        "Mejilla",
+        "Cuero cabelludo",
+        "Cuello",
+        "Traqueostomía",
+        "Zona de máscara / VNI",
+        "Zona de tubo / fijación",
+        "Zona de CNG / SNG",
+        "Zona de catéter / dispositivo médico",
+        "Otra localización",
+    ],
+}
+
+LOCALIZACIONES_UPP = ["", *sorted({zona for zonas in MAPA_CORPORAL.values() for zona in zonas if zona != "Otra localización"}), "Otra localización"]
 LATERALIDADES_UPP = ["", "Derecha", "Izquierda", "Bilateral", "Medial / central", "No aplica"]
 
 ESTADIOS_UPP = [
@@ -111,6 +163,24 @@ def s(valor: Any) -> str:
     return str(valor or "").strip()
 
 
+def obtener_zonas_mapa(vista: Any) -> list[str]:
+    """Devuelve las zonas anatómicas disponibles para la vista elegida."""
+    vista_txt = s(vista)
+    zonas = MAPA_CORPORAL.get(vista_txt, [])
+    return [""] + zonas if zonas else [""]
+
+
+def resumen_mapa_corporal() -> dict[str, str]:
+    """Resumen breve del mapa corporal para mostrar en la UI."""
+    return {
+        "Anterior": "Frente, mentón, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, rodilla, tibia, dorso del pie, dedos.",
+        "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro, cóccix, glúteo, isquion, hueco poplíteo, gemelos, talón, planta.",
+        "Lateral derecha": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
+        "Lateral izquierda": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
+        "Cabeza / cara / dispositivos": "Nariz, labio, mejilla, cuero cabelludo, cuello, traqueostomía y zonas asociadas a dispositivos.",
+    }
+
+
 def puntaje_desde_opcion(opcion: Any) -> int:
     """Extrae el puntaje inicial de una opción tipo '3 - texto'."""
     match = re.match(r"\s*(\d+)", str(opcion or ""))
@@ -171,14 +241,20 @@ def formatear_dimensiones(largo: Any, ancho: Any, profundidad: Any) -> str:
 def formatear_lesion_upp(lesion: dict, indice: int) -> str:
     """Devuelve una línea clínica para una lesión UPP."""
     encabezado = []
+    vista = s(lesion.get("vista"))
     localizacion = s(lesion.get("localizacion"))
     lateralidad = s(lesion.get("lateralidad"))
     estadio = s(lesion.get("estadio"))
+    detalle_topografico = s(lesion.get("detalle_topografico"))
 
+    if vista:
+        encabezado.append(f"vista {vista.lower()}")
     if localizacion:
         encabezado.append(localizacion)
     if lateralidad:
         encabezado.append(lateralidad.lower())
+    if detalle_topografico:
+        encabezado.append(f"detalle anatómico: {detalle_topografico}")
     if estadio:
         encabezado.append(estadio)
 
