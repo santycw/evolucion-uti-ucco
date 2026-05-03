@@ -31,6 +31,9 @@ from modules.upp import (
     SUPERFICIES_APOYO,
     FRECUENCIAS_CAMBIO,
     calcular_braden,
+    limpiar_seleccion_svg,
+    render_svg_mapa_corporal,
+    resolver_seleccion_svg,
 )
 
 # Compatibilidad defensiva: evita que Streamlit falle si GitHub actualizó app.py
@@ -38,77 +41,27 @@ from modules.upp import (
 try:
     from modules.upp import (
         VISTAS_CORPORALES,
-        obtener_zonas_mapa,
-        render_mapa_clickeable,
+        render_svg_mapa_corporal,
+        resolver_seleccion_svg,
         resumen_mapa_corporal,
     )
 except ImportError:
     VISTAS_CORPORALES = ["Anterior", "Posterior"]
 
-    _MAPA_CORPORAL_FALLBACK = {
-        "Anterior": [
-            "",
-            "1. Frente / cara",
-            "2. Oreja / región malar",
-            "3. Hombro / clavícula",
-            "4. Tórax anterior",
-            "5. Mamas / pliegue submamario",
-            "6. Abdomen",
-            "7. Cresta ilíaca anterior",
-            "8. Periné / región inguinal",
-            "9. Muslo anterior",
-            "10. Rodilla",
-            "11. Tibia / cara anterior pierna",
-            "12. Maléolo medial",
-            "13. Dorso del pie",
-            "14. Dedos del pie",
-            "15. Otra localización anterior",
-        ],
-        "Posterior": [
-            "",
-            "1. Occipital",
-            "2. Pabellón auricular",
-            "3. Hombro / escápula",
-            "4. Columna dorsal",
-            "5. Codo / olécranon",
-            "6. Sacro / cóccix",
-            "7. Glúteo",
-            "8. Isquion",
-            "9. Trocánter",
-            "10. Muslo posterior",
-            "11. Hueco poplíteo",
-            "12. Gemelos / pantorrilla",
-            "13. Talón",
-            "14. Planta del pie",
-            "15. Otra localización posterior",
-        ],
-    }
-
-    def obtener_zonas_mapa(vista):
-        return _MAPA_CORPORAL_FALLBACK.get(str(vista or ""), [""])
-
     def resumen_mapa_corporal():
         return {
-            "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
-            "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
+            "Anterior": "Silueta anterior: cara, región malar, hombro/clavícula, tórax, pliegue submamario, abdomen, cresta ilíaca, periné, muslo, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
+            "Posterior": "Silueta posterior: occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
         }
 
-    def render_mapa_clickeable(vista, state_key):
-        zonas = obtener_zonas_mapa(vista)
-        return st.selectbox("Zona anatómica del mapa", zonas, key=f"{state_key}_fallback")
+    def resolver_seleccion_svg(vista, state_key):
+        return st.session_state.get(f"upp_svg_sel_{state_key}", "")
 
-    def render_silueta_corporal(vista):
-        zonas = _MAPA_CORPORAL_FALLBACK.get(str(vista or "Anterior"), _MAPA_CORPORAL_FALLBACK["Anterior"])
-        items = "".join(f"<li>{zona}</li>" for zona in zonas if zona)
-        return f"""
-        <div style='background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:10px'>
-            <div style='color:#f8fafc;font-weight:700;margin-bottom:8px'>Mapa corporal {str(vista or "Anterior").lower()}</div>
-            <div style='background:#ffffff;border-radius:10px;padding:12px;color:#111827;font-size:13px'>
-                <b>Zonas numeradas:</b>
-                <ol style='padding-left:18px;margin-top:8px'>{items}</ol>
-            </div>
-        </div>
-        """
+    def limpiar_seleccion_svg(state_key):
+        st.session_state[f"upp_svg_sel_{state_key}"] = ""
+
+    def render_svg_mapa_corporal(vista, state_key, selected_zone=""):
+        return "<div style='padding:12px;border:1px solid #cbd5e1;border-radius:10px'>Mapa SVG no disponible en este despliegue. Actualice modules/upp.py.</div>"
 
 from modules.validaciones import (
     calcular_par,
@@ -677,8 +630,8 @@ with tab_piel:
                 st.markdown(f"- **{componente}:** {valor} pts")
 
     with st.container(border=True):
-        st.subheader("🗺️ Mapa corporal clickeable de lesiones por presión / piel")
-        st.caption("Diseño interactivo: utilice el mapa corporal clickeable para seleccionar la localización anatómica de cada escara. Luego complete sus características para volcarlas en la evolución final.")
+        st.subheader("🗺️ Mapa corporal SVG interactivo de lesiones por presión / piel")
+        st.caption("Seleccione la vista corporal y haga clic directamente sobre la silueta anterior/posterior para asignar la localización de cada lesión. La zona elegida se resaltará y se volcará en la evolución final.")
 
         mapa_resumen = resumen_mapa_corporal()
         mp1, mp2 = st.columns(2)
@@ -705,9 +658,19 @@ with tab_piel:
                 vista = l1.selectbox("Vista corporal", VISTAS_CORPORALES, key=f"upp_vista_{idx}_{rk}")
                 lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
 
-                localizacion = render_mapa_clickeable(vista, state_key=f"upp_mapa_{idx}_{rk}")
-                if not localizacion:
-                    st.warning("Seleccione una zona anatómica en el mapa corporal clickeable para esta lesión.")
+                svg_slot_key = f"{idx}_{rk}"
+                localizacion = resolver_seleccion_svg(vista, svg_slot_key)
+                st.markdown(render_svg_mapa_corporal(vista, svg_slot_key, localizacion), unsafe_allow_html=True)
+                info1, info2 = st.columns([5,1])
+                with info1:
+                    if localizacion:
+                        st.success(f"Zona anatómica seleccionada: {localizacion}")
+                    else:
+                        st.warning("Seleccione una zona anatómica haciendo clic sobre la silueta SVG interactiva.")
+                with info2:
+                    if st.button("Limpiar zona", key=f"upp_clear_zone_{idx}_{rk}"):
+                        limpiar_seleccion_svg(svg_slot_key)
+                        st.rerun()
 
                 estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
                 detalle_topografico = st.text_input(
