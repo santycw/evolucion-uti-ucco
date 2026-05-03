@@ -582,15 +582,24 @@ with tab_piel:
                 lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
 
                 mapa_state_key = f"upp_mapa_sel_{idx}_{rk}"
+                mapa_nonce_key = f"{mapa_state_key}_nonce"
+                if mapa_nonce_key not in st.session_state:
+                    st.session_state[mapa_nonce_key] = 0
+
                 localizacion = st.session_state.get(mapa_state_key, "")
+
+                # Si cambia la vista, se evita arrastrar una selección incompatible.
+                if localizacion and localizacion not in referencias_mapa_corporal(vista):
+                    st.session_state[mapa_state_key] = ""
+                    localizacion = ""
 
                 imagen_mapa = crear_imagen_mapa_corporal(vista, selected_zone=localizacion)
 
                 if streamlit_image_coordinates is not None:
                     click_mapa = streamlit_image_coordinates(
                         imagen_mapa,
-                        key=f"upp_mapa_coords_{idx}_{rk}",
-                        width=900,
+                        key=f"upp_mapa_coords_{idx}_{rk}_{vista}_{st.session_state[mapa_nonce_key]}",
+                        width=imagen_mapa.width,
                     )
                     if click_mapa and isinstance(click_mapa, dict):
                         zona_click = zona_desde_coordenadas(vista, click_mapa.get("x"), click_mapa.get("y"))
@@ -610,6 +619,7 @@ with tab_piel:
 
                 info1, info2 = st.columns([5, 1])
                 with info1:
+                    localizacion = st.session_state.get(mapa_state_key, "")
                     if localizacion:
                         st.success(f"Zona anatómica seleccionada: {localizacion}")
                     else:
@@ -617,6 +627,7 @@ with tab_piel:
                 with info2:
                     if st.button("Limpiar zona", key=f"upp_clear_zone_{idx}_{rk}"):
                         st.session_state[mapa_state_key] = ""
+                        st.session_state[mapa_nonce_key] += 1
                         st.rerun()
 
                 with st.expander("Ver referencias anatómicas del mapa", expanded=False):

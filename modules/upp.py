@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -117,6 +118,10 @@ CROP_BOXES = {
     "Posterior": (1024, 0, 2048, 1117),
 }
 
+# Imagen redimensionada para acelerar respuesta y evitar errores por escalado
+# entre coordenadas del componente y coordenadas reales de la imagen.
+MAPA_DISPLAY_WIDTH = 760
+
 # Coordenadas detectadas sobre la imagen original adjunta.
 # Los puntos múltiples permiten seleccionar zonas bilaterales como codos.
 _HOTSPOTS_FULL = {
@@ -177,28 +182,61 @@ def obtener_zonas_mapa(vista: Any) -> list[str]:
     return [""] + referencias_mapa_corporal(vista_txt)
 
 
-def crear_imagen_mapa_corporal(vista: str, selected_zone: str = "") -> Image.Image:
+def _crop_size(vista: str) -> tuple[int, int]:
+    x0, y0, x1, y1 = _crop_box(vista)
+    return x1 - x0, y1 - y0
+
+
+def _display_scale(vista: str) -> float:
+    crop_w, _ = _crop_size(vista)
+    return MAPA_DISPLAY_WIDTH / crop_w
+
+
+def _to_display_coords(vista: str, point: tuple[int, int]) -> tuple[int, int]:
+    x_crop, y_crop = _to_crop_coords(vista, point)
+    escala = _display_scale(vista)
+    return int(round(x_crop * escala)), int(round(y_crop * escala))
+
+
+@lru_cache(maxsize=4)
+def _base_mapa_redimensionada(vista: str) -> Image.Image:
     """
-    Abre la imagen anatómica adjunta, recorta la vista anterior/posterior
-    y resalta la zona seleccionada.
+    Carga, recorta y redimensiona la imagen una sola vez.
+    Esto mejora la velocidad de respuesta en Streamlit Cloud.
     """
     vista = vista if vista in VISTAS_CORPORALES else "Anterior"
     base = Image.open(MAPA_IMAGEN_PATH).convert("RGBA")
-    crop = base.crop(_crop_box(vista)).copy()
+    crop = base.crop(_crop_box(vista))
+    crop_w, crop_h = crop.size
+    new_h = int(round(crop_h * (MAPA_DISPLAY_WIDTH / crop_w)))
+    return crop.resize((MAPA_DISPLAY_WIDTH, new_h), Image.Resampling.LANCZOS)
+
+
+def crear_imagen_mapa_corporal(vista: str, selected_zone: str = "") -> Image.Image:
+    """
+    Abre la imagen anatómica adjunta, recorta la vista anterior/posterior,
+    la redimensiona y resalta la zona seleccionada.
+    """
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+    crop = _base_mapa_redimensionada(vista).copy()
 
     if selected_zone and selected_zone in _HOTSPOTS_FULL.get(vista, {}):
         draw = ImageDraw.Draw(crop)
         for point in _HOTSPOTS_FULL[vista][selected_zone]:
-            cx, cy = _to_crop_coords(vista, point)
-            draw.ellipse((cx - 28, cy - 28, cx + 28, cy + 28), outline=(0, 180, 0, 255), width=8)
-            draw.ellipse((cx - 12, cy - 12, cx + 12, cy + 12), outline=(0, 180, 0, 255), width=4)
+            cx, cy = _to_display_coords(vista, point)
+            draw.ellipse((cx - 24, cy - 24, cx + 24, cy + 24), outline=(0, 180, 0, 255), width=7)
+            draw.ellipse((cx - 10, cy - 10, cx + 10, cy + 10), outline=(0, 180, 0, 255), width=4)
 
     return crop.convert("RGB")
 
 
-def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 75) -> str:
+def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 55) -> str:
     """
-    Convierte coordenadas del clic sobre la vista recortada en la zona anatómica más cercana.
+    Convierte coordenadas del clic sobre la imagen redimensionada en la zona anatómica más cercana.
+
+    Importante:
+    streamlit-image-coordinates devuelve coordenadas sobre el tamaño renderizado.
+    Por eso los hotspots se comparan contra coordenadas ya escaladas.
     """
     vista = vista if vista in VISTAS_CORPORALES else "Anterior"
     try:
@@ -212,7 +250,7 @@ def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 75) -> st
 
     for zona, points in _HOTSPOTS_FULL.get(vista, {}).items():
         for full_point in points:
-            cx, cy = _to_crop_coords(vista, full_point)
+            cx, cy = _to_display_coords(vista, full_point)
             dist = math.sqrt((x_f - cx) ** 2 + (y_f - cy) ** 2)
             if dist < mejor_dist:
                 mejor_dist = dist
