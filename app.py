@@ -65,6 +65,8 @@ def d_str(valor_default):
     """Retorna un string vacío si la orden de limpieza global está activa."""
     return "" if st.session_state.get('limpiar_prellenado', False) else valor_default
 
+rk = st.session_state['rk']
+
 def rerun_app():
     """Reejecuta la app manteniendo compatibilidad con versiones de Streamlit."""
     if hasattr(st, "rerun"):
