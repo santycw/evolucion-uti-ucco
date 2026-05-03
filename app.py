@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import datetime
 from modules.evolucion import generar_texto_evolucion
 from modules.infusiones import (
@@ -90,12 +91,10 @@ def rerun_app():
     else:
         st.experimental_rerun()
 
-def render_html_seguro(html: str):
-    """Renderiza HTML/SVG evitando que Streamlit lo muestre como texto plano."""
-    if hasattr(st, "html"):
-        st.html(html)
-    else:
-        st.markdown(html, unsafe_allow_html=True)
+def render_html_seguro(html: str, height: int = 820):
+    """Renderiza HTML/SVG real dentro de un componente HTML de Streamlit."""
+    components.html(html, height=height, scrolling=True)
+
 
 rk = st.session_state['rk']
 

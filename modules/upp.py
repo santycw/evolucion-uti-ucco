@@ -237,7 +237,7 @@ def render_svg_mapa_corporal(vista: str, state_key: str, selected_zone: str = ""
         </div>
         <div style='flex:1;min-width:240px;background:#ffffff;border-radius:12px;padding:12px;border:1px solid #cbd5e1;color:#111827;'>
           <div style='font-weight:700;margin-bottom:8px'>Referencias anatómicas</div>
-          <ol style='margin:0;padding-left:20px;font-size:13px;line-height:1.35'>{leyenda}</ol>
+          <ul style='margin:0;padding-left:18px;font-size:13px;line-height:1.35;list-style:none'>{leyenda}</ul>
           <div style='margin-top:10px;font-size:12px;color:#475569'>La zona seleccionada se resalta en rojo.</div>
         </div>
       </div>
