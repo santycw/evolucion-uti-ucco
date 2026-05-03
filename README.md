@@ -85,3 +85,17 @@ Estados usados:
 - `manual_pendiente_auto`: disponible como ingreso manual y planificado para automatización futura.
 
 > Las referencias del catálogo son orientativas para trazabilidad/auditoría. Validar fórmulas, puntos de corte e indicaciones con guías institucionales antes de uso clínico formal.
+
+## Módulo Piel / UPP / Decúbito
+
+La versión actual incorpora una pestaña específica para documentar:
+
+- estado general de piel;
+- decúbito actual;
+- frecuencia de cambios posturales;
+- superficie de apoyo;
+- medidas preventivas de lesiones por presión;
+- score de Braden automático;
+- registro simple de lesiones por presión, localización, lado, estadio/tipo, dimensiones, lecho, exudado, piel perilesional, signos de infección, dolor, observaciones y conducta.
+
+El bloque se imprime en la evolución final bajo `PIEL / UPP / DECÚBITO`.

@@ -12,6 +12,27 @@ from modules.infusiones import (
 from modules.scores import calcular_scores_contexto, formatear_scores_detectados, motor_scores
 from modules.scores_catalog import agrupar_catalogo_por_categoria, resumen_estado_catalogo
 from modules.terminologia import cargar_diccionario_medico, detectar_en_db, normalizar_texto_medico
+from modules.upp import (
+    BRADEN_ACTIVIDAD,
+    BRADEN_FRICCION,
+    BRADEN_HUMEDAD,
+    BRADEN_MOVILIDAD,
+    BRADEN_NUTRICION,
+    BRADEN_PERCEPCION,
+    DECUBITOS,
+    DOLOR_UPP,
+    ESTADIOS_UPP,
+    EXUDADOS_UPP,
+    INFECCION_UPP,
+    LATERALIDADES_UPP,
+    LECHOS_UPP,
+    LOCALIZACIONES_UPP,
+    MEDIDAS_PREVENCION,
+    PERILESIONAL_UPP,
+    SUPERFICIES_APOYO,
+    FRECUENCIAS_CAMBIO,
+    calcular_braden,
+)
 from modules.validaciones import (
     calcular_par,
     calcular_qtc_bazett,
@@ -241,10 +262,11 @@ if is_fa:
 st.divider()
 
 # --- CUERPO PRINCIPAL ---
-tab_clinica, tab_lab, tab_estudios, tab_planes = st.tabs([
+tab_clinica, tab_lab, tab_estudios, tab_piel, tab_planes = st.tabs([
     "🩺 Clínica y Examen",
     "🧪 Laboratorio Integral",
     "🩻 ECG y Estudios",
+    "🩹 Piel / UPP / Decúbito",
     "📋 Plan y FAST-HUG"
 ])
 
@@ -507,6 +529,127 @@ with tab_estudios:
         rx_torax = st.text_area("Rx Tórax / Radiografías", height=68, key=f"rx_{rk}")
         tc = st.text_area("Tomografía (TC)", height=68, key=f"tc_{rk}")
         eco = st.text_area("Ecografía / POCUS", height=68, key=f"eco_{rk}")
+
+
+# --- PIEL / UPP / DECÚBITO ---
+with tab_piel:
+    st.info("💡 Módulo simple para registrar piel, decúbito, prevención de UPP, lesiones y score de Braden.")
+
+    with st.container(border=True):
+        st.subheader("🩹 Estado de piel y decúbito")
+        piel_estado = st.text_area(
+            "Estado general de piel",
+            d_str("Piel íntegra, sin lesiones por presión visibles."),
+            height=70,
+            key=f"piel_estado_{rk}",
+        )
+
+        d_col1, d_col2, d_col3 = st.columns(3)
+        decubito_actual = d_col1.selectbox("Decúbito actual", DECUBITOS, key=f"decubito_actual_{rk}")
+        cambios_posturales = d_col2.selectbox("Cambios posturales", FRECUENCIAS_CAMBIO, key=f"cambios_posturales_{rk}")
+        superficie_apoyo = d_col3.selectbox("Superficie de apoyo", SUPERFICIES_APOYO, key=f"superficie_apoyo_{rk}")
+
+        upp_medidas_prevencion = st.multiselect(
+            "Medidas preventivas",
+            MEDIDAS_PREVENCION,
+            default=[],
+            key=f"upp_medidas_prevencion_{rk}",
+        )
+        upp_conducta_general = st.text_area(
+            "Conducta general piel / UPP",
+            placeholder="Ej: continuar cambios posturales c/2 h, protección sacra, descarga de talones...",
+            height=68,
+            key=f"upp_conducta_general_{rk}",
+        )
+
+    with st.container(border=True):
+        st.subheader("📊 Score de Braden")
+        st.caption("Escala de 6 a 23 puntos. A menor puntaje, mayor riesgo de lesión por presión.")
+
+        b1, b2, b3 = st.columns(3)
+        braden_percepcion = b1.selectbox("Percepción sensorial", BRADEN_PERCEPCION, key=f"braden_percepcion_{rk}")
+        braden_humedad = b2.selectbox("Humedad", BRADEN_HUMEDAD, key=f"braden_humedad_{rk}")
+        braden_actividad = b3.selectbox("Actividad", BRADEN_ACTIVIDAD, key=f"braden_actividad_{rk}")
+
+        b4, b5, b6 = st.columns(3)
+        braden_movilidad = b4.selectbox("Movilidad", BRADEN_MOVILIDAD, key=f"braden_movilidad_{rk}")
+        braden_nutricion = b5.selectbox("Nutrición", BRADEN_NUTRICION, key=f"braden_nutricion_{rk}")
+        braden_friccion = b6.selectbox("Fricción / cizalla", BRADEN_FRICCION, key=f"braden_friccion_{rk}")
+
+        braden_resultado = calcular_braden(
+            braden_percepcion,
+            braden_humedad,
+            braden_actividad,
+            braden_movilidad,
+            braden_nutricion,
+            braden_friccion,
+        )
+        braden_puntaje = braden_resultado.get("puntaje")
+        braden_texto = f"Braden: {braden_puntaje}/23 - {braden_resultado.get('riesgo')}" if braden_puntaje is not None else "Braden no calculado"
+
+        if braden_resultado.get("nivel") in ["critico"]:
+            st.error(braden_texto)
+        elif braden_resultado.get("nivel") in ["alto", "intermedio"]:
+            st.warning(braden_texto)
+        else:
+            st.success(braden_texto)
+        st.caption(braden_resultado.get("detalle", ""))
+
+        with st.expander("🔎 Ver componentes de Braden", expanded=False):
+            for componente, valor in braden_resultado.get("componentes", {}).items():
+                st.markdown(f"- **{componente}:** {valor} pts")
+
+    with st.container(border=True):
+        st.subheader("📍 Lesiones por presión / piel")
+        cantidad_lesiones_upp = st.number_input(
+            "Cantidad de lesiones a registrar",
+            min_value=0,
+            max_value=8,
+            value=0,
+            step=1,
+            key=f"cantidad_lesiones_upp_{rk}",
+        )
+
+        upp_lesiones = []
+        for idx in range(int(cantidad_lesiones_upp)):
+            with st.expander(f"Lesión {idx + 1}", expanded=True):
+                l1, l2, l3 = st.columns(3)
+                localizacion = l1.selectbox("Localización", LOCALIZACIONES_UPP, key=f"upp_loc_{idx}_{rk}")
+                lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
+                estadio = l3.selectbox("Estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
+
+                m1, m2, m3 = st.columns(3)
+                largo_cm = m1.text_input("Largo (cm)", key=f"upp_largo_{idx}_{rk}")
+                ancho_cm = m2.text_input("Ancho (cm)", key=f"upp_ancho_{idx}_{rk}")
+                profundidad_cm = m3.text_input("Profundidad (cm)", key=f"upp_prof_{idx}_{rk}")
+
+                c1, c2, c3 = st.columns(3)
+                lecho = c1.selectbox("Lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
+                exudado = c2.selectbox("Exudado", EXUDADOS_UPP, key=f"upp_exudado_{idx}_{rk}")
+                perilesional = c3.selectbox("Piel perilesional", PERILESIONAL_UPP, key=f"upp_perilesional_{idx}_{rk}")
+
+                c4, c5 = st.columns(2)
+                infeccion = c4.selectbox("Signos de infección", INFECCION_UPP, key=f"upp_infeccion_{idx}_{rk}")
+                dolor = c5.selectbox("Dolor", DOLOR_UPP, key=f"upp_dolor_{idx}_{rk}")
+
+                observaciones = st.text_area("Observaciones", height=68, key=f"upp_obs_{idx}_{rk}")
+                conducta = st.text_area("Conducta / curación indicada", height=68, key=f"upp_cond_{idx}_{rk}")
+
+                upp_lesiones.append({
+                    "localizacion": localizacion,
+                    "lateralidad": lateralidad,
+                    "estadio": estadio,
+                    "largo_cm": largo_cm,
+                    "ancho_cm": ancho_cm,
+                    "profundidad_cm": profundidad_cm,
+                    "lecho": lecho,
+                    "exudado": exudado,
+                    "perilesional": perilesional,
+                    "infeccion": infeccion,
+                    "dolor": dolor,
+                    "observaciones": observaciones,
+                    "conducta": conducta,
+                })
 
 
 # --- RUTINA CENTRAL DE AUTO-CÁLCULO V2.0 ---

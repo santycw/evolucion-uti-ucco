@@ -12,6 +12,7 @@ import re
 
 from .scores import formatear_scores_detectados
 from .validaciones import p_num
+from .upp import formatear_bloque_upp
 
 
 def s(valor: Any) -> str:
@@ -263,6 +264,8 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
     fast_sel = datos.get("fast_sel", []) or []
     fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
 
+    bloque_piel_upp = formatear_bloque_upp(datos)
+
     bloque_scores_impresion = ""
     if scores_para_imprimir:
         lineas_impresion = formatear_scores_detectados(scores_para_imprimir)
@@ -292,7 +295,7 @@ Invasiones: CVC: {datos.get('cvc_info')} | Cat.Art: {datos.get('ca_info')} | SV:
 - RESP: {texto_resp}
 - ABD/RENAL: {datos.get('ex_abd')} | Ex. Renal: {datos.get('ex_renal')}{nutri_txt}{balance_txt}
 
->> LABORATORIO Y MEDIO INTERNO:
+{bloque_piel_upp}>> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
 {bloque_estudios}
 >> FAST HUG BID:
