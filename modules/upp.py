@@ -1,20 +1,21 @@
 """
 Módulo UPP / decúbito / Braden.
 
-Centraliza opciones, cálculo de Braden, representación visual del mapa corporal
-(anterior/posterior) y formateo del bloque de piel para mantener app.py como
-interfaz y preservar la generación estructurada.
+Incluye cálculo de Braden, mapa corporal SVG interactivo (anterior/posterior)
+y formateo del bloque de piel / UPP para la evolución final.
 """
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
 
-# --- MAPA CORPORAL VISUAL SIMPLE (ANTERIOR / POSTERIOR) ---
+# --- MAPA CORPORAL SVG INTERACTIVO ---
 VISTAS_CORPORALES = ["Anterior", "Posterior"]
 
 MAPA_CORPORAL = {
@@ -52,6 +53,20 @@ MAPA_CORPORAL = {
         "14. Planta del pie",
         "15. Otra localización posterior",
     ],
+}
+
+# Posiciones de hotspots sobre la silueta simplificada
+_HOTSPOTS = {
+    "Anterior": {
+        1:(160,48), 2:(205,72), 3:(94,114), 4:(160,135), 5:(160,171), 6:(160,214),
+        7:(160,258), 8:(160,300), 9:(138,356), 10:(138,442), 11:(138,515), 12:(138,572),
+        13:(138,635), 14:(138,675), 15:(252,706),
+    },
+    "Posterior": {
+        1:(160,48), 2:(205,72), 3:(96,116), 4:(160,150), 5:(87,220), 6:(160,274),
+        7:(160,317), 8:(160,356), 9:(232,346), 10:(138,414), 11:(138,486), 12:(138,548),
+        13:(138,646), 14:(138,685), 15:(252,706),
+    },
 }
 
 LATERALIDADES_UPP = ["", "Derecha", "Izquierda", "Bilateral", "Medial / central", "No aplica"]
@@ -136,16 +151,9 @@ def obtener_zonas_mapa(vista: Any) -> list[str]:
     return [""] + zonas if zonas else [""]
 
 
-def resumen_mapa_corporal() -> dict[str, str]:
-    return {
-        "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
-        "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
-    }
-
-
-def _extraer_numero_zona(zona: str) -> str:
+def _extraer_numero_zona(zona: str) -> int | None:
     match = re.match(r"\s*(\d+)", str(zona or ""))
-    return match.group(1) if match else str(zona or "")
+    return int(match.group(1)) if match else None
 
 
 def _texto_zona_sin_numero(zona: str) -> str:
@@ -154,110 +162,110 @@ def _texto_zona_sin_numero(zona: str) -> str:
 
 def resumen_mapa_corporal() -> dict[str, str]:
     return {
-        "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
-        "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
+        "Anterior": "Silueta anterior: cara, región malar, hombro/clavícula, tórax, pliegue submamario, abdomen, cresta ilíaca, periné, muslo, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
+        "Posterior": "Silueta posterior: occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
     }
 
 
-MAPA_CLICK_LAYOUT = {
-    "Anterior": [
-        [None, None, "1. Frente / cara", None, None],
-        [None, None, "2. Oreja / región malar", None, None],
-        [None, "3. Hombro / clavícula", "4. Tórax anterior", None, None],
-        [None, None, "5. Mamas / pliegue submamario", None, None],
-        [None, None, "6. Abdomen", None, None],
-        [None, None, "7. Cresta ilíaca anterior", None, None],
-        [None, None, "8. Periné / región inguinal", None, None],
-        [None, None, "9. Muslo anterior", None, None],
-        [None, None, "10. Rodilla", None, None],
-        [None, None, "11. Tibia / cara anterior pierna", None, None],
-        [None, None, "12. Maléolo medial", None, None],
-        [None, None, "13. Dorso del pie", None, None],
-        [None, None, "14. Dedos del pie", None, None],
-        [None, None, "15. Otra localización anterior", None, None],
-    ],
-    "Posterior": [
-        [None, None, "1. Occipital", None, None],
-        [None, None, "2. Pabellón auricular", None, None],
-        [None, "3. Hombro / escápula", "4. Columna dorsal", None, None],
-        [None, "5. Codo / olécranon", None, None, None],
-        [None, None, "6. Sacro / cóccix", None, None],
-        [None, None, "7. Glúteo", None, None],
-        [None, None, "8. Isquion", None, None],
-        [None, None, "9. Trocánter", None, None],
-        [None, None, "10. Muslo posterior", None, None],
-        [None, None, "11. Hueco poplíteo", None, None],
-        [None, None, "12. Gemelos / pantorrilla", None, None],
-        [None, None, "13. Talón", None, None],
-        [None, None, "14. Planta del pie", None, None],
-        [None, None, "15. Otra localización posterior", None, None],
-    ],
-}
+def _build_pick_url(vista: str, zona: str, state_key: str) -> str:
+    params = dict(st.query_params)
+    params["upp_pick_slot"] = state_key
+    params["upp_pick_view"] = vista
+    params["upp_pick_zone"] = zona
+    return "?" + urlencode(params, doseq=False)
 
 
-def render_mapa_clickeable(vista: str, state_key: str) -> str:
-    """Renderiza un mapa corporal clickeable con botones y devuelve la zona seleccionada."""
-    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
-    estado_key = f"{state_key}_seleccion"
-    layout = MAPA_CLICK_LAYOUT.get(vista, [])
-    zonas_validas = MAPA_CORPORAL.get(vista, [])
-
-    seleccion_actual = st.session_state.get(estado_key, "")
-    if seleccion_actual and seleccion_actual not in zonas_validas:
-        st.session_state[estado_key] = ""
-        seleccion_actual = ""
-
-    st.markdown(
-        f"<div style='border:1px solid #cbd5e1;border-radius:12px;padding:12px;background:#f8fafc;'>"
-        f"<div style='font-weight:700;margin-bottom:6px'>Mapa corporal {vista.lower()} clickeable</div>"
-        f"<div style='font-size:12px;color:#475569;margin-bottom:8px'>Haga clic sobre el número/zona anatómica que corresponda a la escara o lesión por presión.</div>",
-        unsafe_allow_html=True,
-    )
-
-    for fila in layout:
-        cols = st.columns(5, gap='small')
-        for i, zona in enumerate(fila):
-            with cols[i]:
-                if zona:
-                    numero = _extraer_numero_zona(zona)
-                    etiqueta = f"✅ {numero}" if zona == seleccion_actual else numero
-                    if st.button(etiqueta, key=f"{state_key}_{vista}_{numero}", help=_texto_zona_sin_numero(zona), use_container_width=True):
-                        st.session_state[estado_key] = zona
-                        seleccion_actual = zona
-                else:
-                    st.markdown("<div style='height:2.3rem'></div>", unsafe_allow_html=True)
-
-    c1, c2 = st.columns([4,1])
-    with c1:
-        if seleccion_actual:
-            st.success(f"Zona seleccionada: {seleccion_actual}")
-        else:
-            st.info("Todavía no hay una zona anatómica seleccionada.")
-    with c2:
-        if st.button("Limpiar", key=f"{state_key}_limpiar"):
-            st.session_state[estado_key] = ""
-            seleccion_actual = ""
-            st.rerun()
-
-    with st.expander("Ver referencia anatómica del mapa", expanded=False):
-        for zona in zonas_validas:
-            st.markdown(f"- **{_extraer_numero_zona(zona)}**: {_texto_zona_sin_numero(zona)}")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    return seleccion_actual
-
-
-def render_silueta_corporal(vista: str) -> str:
-    """Compatibilidad retroactiva: conserva una vista no interactiva cuando sea necesario."""
-    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
-    zonas = MAPA_CORPORAL.get(vista, [])
-    items = "".join([f"<li style='margin-bottom:3px'>{zona}</li>" for zona in zonas])
+def _svg_hotspot(vista: str, zona: str, state_key: str, selected: bool) -> str:
+    numero = _extraer_numero_zona(zona) or 0
+    cx, cy = _HOTSPOTS[vista][numero]
+    fill = "#ef4444" if selected else "#f59e0b"
+    stroke = "#7f1d1d" if selected else "#1f2937"
+    text_fill = "#ffffff" if selected else "#111827"
+    title = html.escape(_texto_zona_sin_numero(zona))
+    href = html.escape(_build_pick_url(vista, zona, state_key), quote=True)
     return (
-        f"<div style='border:1px solid #cbd5e1;border-radius:12px;padding:12px;background:#f8fafc'>"
-        f"<div style='font-weight:700;margin-bottom:6px'>Mapa corporal {vista.lower()}</div>"
-        f"<ol style='padding-left:18px;margin-top:8px'>{items}</ol>"
-        f"</div>"
+        f"<a href='{href}' target='_self'>"
+        f"<title>{title}</title>"
+        f"<circle cx='{cx}' cy='{cy}' r='16' fill='{fill}' stroke='{stroke}' stroke-width='2'/>"
+        f"<text x='{cx}' y='{cy + 5}' text-anchor='middle' font-family='Arial' font-size='14' font-weight='700' fill='{text_fill}'>{numero}</text>"
+        f"</a>"
     )
+
+
+def _svg_body_base() -> str:
+    return """
+        <circle cx='160' cy='58' r='36' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='144' y='92' width='32' height='22' rx='10' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='110' y='116' width='100' height='168' rx='42' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='122' y='284' width='76' height='98' rx='28' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='80' y='126' width='24' height='124' rx='12' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='216' y='126' width='24' height='124' rx='12' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='74' y='245' width='22' height='112' rx='11' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='224' y='245' width='22' height='112' rx='11' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='118' y='380' width='28' height='148' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='174' y='380' width='28' height='148' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='118' y='528' width='28' height='128' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <rect x='174' y='528' width='28' height='128' rx='14' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <ellipse cx='132' cy='678' rx='28' ry='15' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+        <ellipse cx='188' cy='678' rx='28' ry='15' fill='#d1d5db' stroke='#475569' stroke-width='3'/>
+    """
+
+
+def render_svg_mapa_corporal(vista: str, state_key: str, selected_zone: str = "") -> str:
+    """Devuelve HTML/SVG interactivo real con zonas clickeables sobre una silueta."""
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+    selected_zone = s(selected_zone)
+    hotspots = "".join(
+        _svg_hotspot(vista, zona, state_key, zona == selected_zone)
+        for zona in MAPA_CORPORAL.get(vista, [])
+    )
+    leyenda = "".join(
+        f"<li><b>{_extraer_numero_zona(z) or ''}</b>: {html.escape(_texto_zona_sin_numero(z))}</li>"
+        for z in MAPA_CORPORAL.get(vista, [])
+    )
+    titulo = f"Silueta corporal {vista.lower()} clickeable"
+    return f"""
+    <div style='border:1px solid #334155;border-radius:14px;background:#0f172a;padding:12px;margin:4px 0 10px 0;'>
+      <div style='color:#f8fafc;font-weight:700;font-size:15px;margin-bottom:4px'>{titulo}</div>
+      <div style='color:#cbd5e1;font-size:12px;margin-bottom:10px'>Haga clic sobre una zona numerada para seleccionar la localización anatómica de la lesión.</div>
+      <div style='display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;'>
+        <div style='background:#e5e7eb;border-radius:14px;padding:8px;'>
+          <svg width='320' height='730' viewBox='0 0 320 730' xmlns='http://www.w3.org/2000/svg'>
+            {_svg_body_base()}
+            {hotspots}
+          </svg>
+        </div>
+        <div style='flex:1;min-width:240px;background:#ffffff;border-radius:12px;padding:12px;border:1px solid #cbd5e1;color:#111827;'>
+          <div style='font-weight:700;margin-bottom:8px'>Referencias anatómicas</div>
+          <ol style='margin:0;padding-left:20px;font-size:13px;line-height:1.35'>{leyenda}</ol>
+          <div style='margin-top:10px;font-size:12px;color:#475569'>La zona seleccionada se resalta en rojo.</div>
+        </div>
+      </div>
+    </div>
+    """
+
+
+def resolver_seleccion_svg(vista: str, state_key: str) -> str:
+    """Consume los query params del mapa SVG y guarda la selección en session_state."""
+    estado_key = f"upp_svg_sel_{state_key}"
+    seleccion = s(st.session_state.get(estado_key, ""))
+    q_slot = s(st.query_params.get("upp_pick_slot", ""))
+    q_view = s(st.query_params.get("upp_pick_view", ""))
+    q_zone = s(st.query_params.get("upp_pick_zone", ""))
+
+    if q_slot == state_key and q_view == vista and q_zone in MAPA_CORPORAL.get(vista, []):
+        st.session_state[estado_key] = q_zone
+        seleccion = q_zone
+
+    if seleccion and seleccion not in MAPA_CORPORAL.get(vista, []):
+        seleccion = ""
+        st.session_state[estado_key] = ""
+
+    return seleccion
+
+
+def limpiar_seleccion_svg(state_key: str) -> None:
+    st.session_state[f"upp_svg_sel_{state_key}"] = ""
 
 
 def puntaje_desde_opcion(opcion: Any) -> int:
@@ -288,10 +296,7 @@ def calcular_braden(percepcion: Any, humedad: Any, actividad: Any, movilidad: An
         "Nutrición": puntaje_desde_opcion(nutricion),
         "Fricción/cizalla": puntaje_desde_opcion(friccion),
     }
-    if any(valor <= 0 for valor in componentes.values()):
-        puntaje = None
-    else:
-        puntaje = sum(componentes.values())
+    puntaje = None if any(valor <= 0 for valor in componentes.values()) else sum(componentes.values())
     interpretacion = interpretar_braden(puntaje)
     return {"puntaje": puntaje, "componentes": componentes, **interpretacion}
 
