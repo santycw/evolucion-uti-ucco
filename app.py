@@ -541,75 +541,20 @@ with tab_estudios:
 
 # --- PIEL / UPP / DECÚBITO ---
 with tab_piel:
-    st.info("💡 Módulo simple para registrar piel, decúbito, prevención de UPP, lesiones y score de Braden.")
+    # Variables vacías mantenidas por compatibilidad con el generador final.
+    piel_estado = ""
+    decubito_actual = ""
+    cambios_posturales = ""
+    superficie_apoyo = ""
+    upp_medidas_prevencion = []
+    upp_conducta_general = ""
+    braden_resultado = {}
+
+    st.info("💡 Módulo de lesiones por presión con mapa anatómico basado en la imagen adjunta. Se retiraron las secciones de Braden, estado general de piel y decúbito.")
 
     with st.container(border=True):
-        st.subheader("🩹 Estado de piel y decúbito")
-        piel_estado = st.text_area(
-            "Estado general de piel",
-            d_str("Piel íntegra, sin lesiones por presión visibles."),
-            height=70,
-            key=f"piel_estado_{rk}",
-        )
-
-        d_col1, d_col2, d_col3 = st.columns(3)
-        decubito_actual = d_col1.selectbox("Decúbito actual", DECUBITOS, key=f"decubito_actual_{rk}")
-        cambios_posturales = d_col2.selectbox("Cambios posturales", FRECUENCIAS_CAMBIO, key=f"cambios_posturales_{rk}")
-        superficie_apoyo = d_col3.selectbox("Superficie de apoyo", SUPERFICIES_APOYO, key=f"superficie_apoyo_{rk}")
-
-        upp_medidas_prevencion = st.multiselect(
-            "Medidas preventivas",
-            MEDIDAS_PREVENCION,
-            default=[],
-            key=f"upp_medidas_prevencion_{rk}",
-        )
-        upp_conducta_general = st.text_area(
-            "Conducta general piel / UPP",
-            placeholder="Ej: continuar cambios posturales c/2 h, protección sacra, descarga de talones...",
-            height=68,
-            key=f"upp_conducta_general_{rk}",
-        )
-
-    with st.container(border=True):
-        st.subheader("📊 Score de Braden")
-        st.caption("Escala de 6 a 23 puntos. A menor puntaje, mayor riesgo de lesión por presión.")
-
-        b1, b2, b3 = st.columns(3)
-        braden_percepcion = b1.selectbox("Percepción sensorial", BRADEN_PERCEPCION, key=f"braden_percepcion_{rk}")
-        braden_humedad = b2.selectbox("Humedad", BRADEN_HUMEDAD, key=f"braden_humedad_{rk}")
-        braden_actividad = b3.selectbox("Actividad", BRADEN_ACTIVIDAD, key=f"braden_actividad_{rk}")
-
-        b4, b5, b6 = st.columns(3)
-        braden_movilidad = b4.selectbox("Movilidad", BRADEN_MOVILIDAD, key=f"braden_movilidad_{rk}")
-        braden_nutricion = b5.selectbox("Nutrición", BRADEN_NUTRICION, key=f"braden_nutricion_{rk}")
-        braden_friccion = b6.selectbox("Fricción / cizalla", BRADEN_FRICCION, key=f"braden_friccion_{rk}")
-
-        braden_resultado = calcular_braden(
-            braden_percepcion,
-            braden_humedad,
-            braden_actividad,
-            braden_movilidad,
-            braden_nutricion,
-            braden_friccion,
-        )
-        braden_puntaje = braden_resultado.get("puntaje")
-        braden_texto = f"Braden: {braden_puntaje}/23 - {braden_resultado.get('riesgo')}" if braden_puntaje is not None else "Braden no calculado"
-
-        if braden_resultado.get("nivel") in ["critico"]:
-            st.error(braden_texto)
-        elif braden_resultado.get("nivel") in ["alto", "intermedio"]:
-            st.warning(braden_texto)
-        else:
-            st.success(braden_texto)
-        st.caption(braden_resultado.get("detalle", ""))
-
-        with st.expander("🔎 Ver componentes de Braden", expanded=False):
-            for componente, valor in braden_resultado.get("componentes", {}).items():
-                st.markdown(f"- **{componente}:** {valor} pts")
-
-    with st.container(border=True):
-        st.subheader("🗺️ Mapa corporal anterior/posterior clickeable de lesiones por presión / piel")
-        st.caption("Seleccione la vista corporal y haga clic sobre los puntos numerados de la silueta. La zona elegida se resaltará y se volcará en la evolución final.")
+        st.subheader("🗺️ Mapa de puntos de presión para úlceras por decúbito")
+        st.caption("Seleccione la vista corporal y haga clic sobre el punto rojo correspondiente a la localización.")
 
         mapa_resumen = resumen_mapa_corporal()
         mp1, mp2 = st.columns(2)
@@ -645,7 +590,7 @@ with tab_piel:
                     click_mapa = streamlit_image_coordinates(
                         imagen_mapa,
                         key=f"upp_mapa_coords_{idx}_{rk}",
-                        width=360,
+                        width=900,
                     )
                     if click_mapa and isinstance(click_mapa, dict):
                         zona_click = zona_desde_coordenadas(vista, click_mapa.get("x"), click_mapa.get("y"))
@@ -668,7 +613,7 @@ with tab_piel:
                     if localizacion:
                         st.success(f"Zona anatómica seleccionada: {localizacion}")
                     else:
-                        st.warning("Seleccione una zona anatómica haciendo clic sobre los puntos numerados del mapa corporal.")
+                        st.warning("Seleccione la localización haciendo clic sobre el punto rojo correspondiente en la imagen.")
                 with info2:
                     if st.button("Limpiar zona", key=f"upp_clear_zone_{idx}_{rk}"):
                         st.session_state[mapa_state_key] = ""
@@ -691,7 +636,7 @@ with tab_piel:
                 profundidad_cm = m3.text_input("Profundidad (cm)", key=f"upp_prof_{idx}_{rk}")
 
                 c1, c2, c3 = st.columns(3)
-                lecho = c1.selectbox("Características del lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
+                lecho = c1.selectbox("Lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
                 exudado = c2.selectbox("Exudado", EXUDADOS_UPP, key=f"upp_exudado_{idx}_{rk}")
                 perilesional = c3.selectbox("Piel perilesional", PERILESIONAL_UPP, key=f"upp_perilesional_{idx}_{rk}")
 
@@ -699,12 +644,12 @@ with tab_piel:
                 infeccion = c4.selectbox("Signos de infección", INFECCION_UPP, key=f"upp_infeccion_{idx}_{rk}")
                 dolor = c5.selectbox("Dolor", DOLOR_UPP, key=f"upp_dolor_{idx}_{rk}")
 
-                observaciones = st.text_area("Observaciones / características adicionales", height=68, key=f"upp_obs_{idx}_{rk}")
-                conducta = st.text_area("Conducta / curación indicada", height=68, key=f"upp_cond_{idx}_{rk}")
+                observaciones = st.text_area("Observaciones", height=68, key=f"upp_obs_{idx}_{rk}")
+                conducta = st.text_area("Conducta local", height=68, key=f"upp_conducta_{idx}_{rk}")
 
                 upp_lesiones.append({
                     "vista": vista,
-                    "localizacion": localizacion,
+                    "localizacion": st.session_state.get(mapa_state_key, ""),
                     "lateralidad": lateralidad,
                     "detalle_topografico": detalle_topografico,
                     "estadio": estadio,
@@ -719,7 +664,6 @@ with tab_piel:
                     "observaciones": observaciones,
                     "conducta": conducta,
                 })
-
 
 # --- RUTINA CENTRAL DE AUTO-CÁLCULO V2.0 ---
 flags_scores = {

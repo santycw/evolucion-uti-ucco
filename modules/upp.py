@@ -1,95 +1,27 @@
-"""
-Módulo UPP / decúbito / Braden.
 
-Incluye cálculo de Braden, mapa corporal anterior/posterior clickeable por
-coordenadas de imagen y formateo del bloque de piel / UPP para la evolución final.
+"""
+Módulo UPP.
+
+Mapa anatómico clickeable basado en la imagen adjunta de puntos de presión
+para úlceras por decúbito.
+
+Se eliminaron de la interfaz:
+- Escala de Braden
+- Estado general de piel
+- Decúbito
 """
 
 from __future__ import annotations
 
 import math
 import re
+from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 
 VISTAS_CORPORALES = ["Anterior", "Posterior"]
-
-MAPA_CORPORAL = {
-    "Anterior": [
-        "1. Frente / cara",
-        "2. Oreja / región malar",
-        "3. Hombro / clavícula",
-        "4. Tórax anterior",
-        "5. Mamas / pliegue submamario",
-        "6. Abdomen",
-        "7. Cresta ilíaca anterior",
-        "8. Periné / región inguinal",
-        "9. Muslo anterior",
-        "10. Rodilla",
-        "11. Tibia / cara anterior pierna",
-        "12. Maléolo medial",
-        "13. Dorso del pie",
-        "14. Dedos del pie",
-        "15. Otra localización anterior",
-    ],
-    "Posterior": [
-        "1. Occipital",
-        "2. Pabellón auricular",
-        "3. Hombro / escápula",
-        "4. Columna dorsal",
-        "5. Codo / olécranon",
-        "6. Sacro / cóccix",
-        "7. Glúteo",
-        "8. Isquion",
-        "9. Trocánter",
-        "10. Muslo posterior",
-        "11. Hueco poplíteo",
-        "12. Gemelos / pantorrilla",
-        "13. Talón",
-        "14. Planta del pie",
-        "15. Otra localización posterior",
-    ],
-}
-
-# Coordenadas sobre la imagen generada por crear_imagen_mapa_corporal().
-_HOTSPOTS = {
-    "Anterior": {
-        1: (160, 54),
-        2: (207, 82),
-        3: (96, 128),
-        4: (160, 150),
-        5: (160, 190),
-        6: (160, 238),
-        7: (160, 286),
-        8: (160, 334),
-        9: (136, 392),
-        10: (136, 480),
-        11: (136, 555),
-        12: (136, 620),
-        13: (136, 684),
-        14: (136, 724),
-        15: (260, 724),
-    },
-    "Posterior": {
-        1: (160, 54),
-        2: (207, 82),
-        3: (96, 128),
-        4: (160, 166),
-        5: (86, 244),
-        6: (160, 306),
-        7: (160, 352),
-        8: (160, 394),
-        9: (232, 384),
-        10: (136, 456),
-        11: (136, 532),
-        12: (136, 598),
-        13: (136, 700),
-        14: (136, 736),
-        15: (260, 724),
-    },
-}
 
 LATERALIDADES_UPP = ["", "Derecha", "Izquierda", "Bilateral", "Medial / central", "No aplica"]
 
@@ -105,12 +37,55 @@ ESTADIOS_UPP = [
     "Lesión por humedad / DAI",
 ]
 
-LECHOS_UPP = ["", "Piel intacta", "Granulación", "Epitelización", "Fibrina", "Esfacelos", "Necrosis", "Escara", "Mixto"]
-EXUDADOS_UPP = ["", "Ausente", "Escaso", "Moderado", "Abundante", "Purulento", "Hemático", "Seroso", "Serohemático"]
-PERILESIONAL_UPP = ["", "Íntegra", "Eritema", "Maceración", "Edema", "Induración", "Calor local", "Dermatitis", "Frágil"]
-INFECCION_UPP = ["", "Sin signos clínicos", "Dolor/calor/eritema local", "Exudado purulento", "Mal olor", "Celulitis", "Sospecha de infección profunda"]
+LECHOS_UPP = [
+    "",
+    "Piel intacta",
+    "Granulación",
+    "Epitelización",
+    "Fibrina",
+    "Esfacelos",
+    "Necrosis",
+    "Escara",
+    "Mixto",
+]
+
+EXUDADOS_UPP = [
+    "",
+    "Ausente",
+    "Escaso",
+    "Moderado",
+    "Abundante",
+    "Purulento",
+    "Hemático",
+    "Seroso",
+    "Serohemático",
+]
+
+PERILESIONAL_UPP = [
+    "",
+    "Íntegra",
+    "Eritema",
+    "Maceración",
+    "Edema",
+    "Induración",
+    "Calor local",
+    "Dermatitis",
+    "Frágil",
+]
+
+INFECCION_UPP = [
+    "",
+    "Sin signos clínicos",
+    "Dolor/calor/eritema local",
+    "Exudado purulento",
+    "Mal olor",
+    "Celulitis",
+    "Sospecha de infección profunda",
+]
+
 DOLOR_UPP = ["", "No evaluable", "Sin dolor", "Leve", "Moderado", "Severo"]
 
+# Se mantienen estas constantes para que otros imports antiguos no rompan la app.
 DECUBITOS = ["", "Dorsal", "Lateral derecho", "Lateral izquierdo", "Prono", "Semifowler", "Fowler", "Sedestación"]
 FRECUENCIAS_CAMBIO = ["", "Cada 2 h", "Cada 3 h", "Cada 4 h", "Según tolerancia", "No aplica", "Otra"]
 SUPERFICIES_APOYO = ["", "Colchón común", "Colchón antiescaras", "Cama de aire alternante", "Superficie viscoelástica", "Sillón", "Otra"]
@@ -126,146 +101,105 @@ MEDIDAS_PREVENCION = [
     "Reevaluación diaria de dispositivos",
 ]
 
-BRADEN_PERCEPCION = [
-    "4 - Sin limitación",
-    "3 - Ligeramente limitada",
-    "2 - Muy limitada",
-    "1 - Completamente limitada",
-]
-BRADEN_HUMEDAD = [
-    "4 - Raramente húmeda",
-    "3 - Ocasionalmente húmeda",
-    "2 - Muy húmeda",
-    "1 - Constantemente húmeda",
-]
-BRADEN_ACTIVIDAD = [
-    "4 - Camina frecuentemente",
-    "3 - Camina ocasionalmente",
-    "2 - En silla",
-    "1 - En cama",
-]
-BRADEN_MOVILIDAD = [
-    "4 - Sin limitación",
-    "3 - Ligeramente limitada",
-    "2 - Muy limitada",
-    "1 - Completamente inmóvil",
-]
-BRADEN_NUTRICION = [
-    "4 - Excelente",
-    "3 - Adecuada",
-    "2 - Probablemente inadecuada",
-    "1 - Muy pobre",
-]
-BRADEN_FRICCION = [
-    "3 - Sin problema aparente",
-    "2 - Problema potencial",
-    "1 - Problema presente",
-]
+BRADEN_PERCEPCION = ["4 - Sin limitación", "3 - Ligeramente limitada", "2 - Muy limitada", "1 - Completamente limitada"]
+BRADEN_HUMEDAD = ["4 - Raramente húmeda", "3 - Ocasionalmente húmeda", "2 - Muy húmeda", "1 - Constantemente húmeda"]
+BRADEN_ACTIVIDAD = ["4 - Camina frecuentemente", "3 - Camina ocasionalmente", "2 - En silla", "1 - En cama"]
+BRADEN_MOVILIDAD = ["4 - Sin limitación", "3 - Ligeramente limitada", "2 - Muy limitada", "1 - Completamente inmóvil"]
+BRADEN_NUTRICION = ["4 - Excelente", "3 - Adecuada", "2 - Probablemente inadecuada", "1 - Muy pobre"]
+BRADEN_FRICCION = ["3 - Sin problema aparente", "2 - Problema potencial", "1 - Problema presente"]
+
+
+MAPA_IMAGEN_PATH = Path(__file__).resolve().parent / "assets" / "mapa_ulceras_presion.png"
+
+# Imagen original 2048 x 1117. Se divide en dos vistas.
+CROP_BOXES = {
+    "Anterior": (0, 0, 1024, 1117),
+    "Posterior": (1024, 0, 2048, 1117),
+}
+
+# Coordenadas detectadas sobre la imagen original adjunta.
+# Los puntos múltiples permiten seleccionar zonas bilaterales como codos.
+_HOTSPOTS_FULL = {
+    "Anterior": {
+        "1. Cabeza (posterior craneal)": [(694, 190)],
+        "2. Hombro (Acromión)": [(592, 318)],
+        "3. Tórax/Costillas": [(694, 389)],
+        "4. Codo (Epicóndilo medial)": [(577, 472)],
+        "5. Cresta Ilíaca": [(635, 542)],
+        "6. Trocánter Mayor (cadera)": [(611, 603)],
+        "7. Rodilla (Rótula)": [(648, 801)],
+        "8. Tobillo (Maléolo lateral)": [(649, 999)],
+        "9. Dedos del pie": [(624, 1053)],
+    },
+    "Posterior": {
+        "10. Occipucio": [(1355, 232)],
+        "11. Escápula (borde)": [(1403, 330)],
+        "12. Columna Vertebral (apófisis)": [(1355, 404)],
+        "13. Codo (Olécranon)": [(1235, 480), (1476, 479)],
+        "14. Sacro": [(1355, 548)],
+        "15. Cóccix": [(1355, 592)],
+        "16. Isquiones": [(1441, 617)],
+        "6. Trocánter Mayor (cadera)": [(1270, 615)],
+        "17. Muslo (posterior)": [(1414, 713)],
+        "18. Talón (Posterior/Tendón)": [(1400, 1027)],
+        "19. Planta del pie": [(1397, 1053)],
+    },
+}
 
 
 def s(valor: Any) -> str:
     return str(valor or "").strip()
 
 
-def obtener_zonas_mapa(vista: Any) -> list[str]:
-    vista_txt = s(vista)
-    zonas = MAPA_CORPORAL.get(vista_txt, [])
-    return [""] + zonas if zonas else [""]
-
-
-def _extraer_numero_zona(zona: Any) -> int | None:
-    match = re.match(r"\s*(\d+)", str(zona or ""))
-    return int(match.group(1)) if match else None
-
-
-def _texto_zona_sin_numero(zona: str) -> str:
-    return re.sub(r"^\s*\d+\.\s*", "", str(zona or "")).strip()
-
-
 def resumen_mapa_corporal() -> dict[str, str]:
     return {
-        "Anterior": "Haga clic en los puntos numerados de la silueta anterior para seleccionar la localización.",
-        "Posterior": "Haga clic en los puntos numerados de la silueta posterior para seleccionar la localización.",
+        "Anterior": "Vista anterior del mapa adjunto de puntos de presión.",
+        "Posterior": "Vista posterior del mapa adjunto de puntos de presión.",
     }
 
 
-def _get_font(size: int = 15):
-    try:
-        return ImageFont.truetype("DejaVuSans-Bold.ttf", size=size)
-    except Exception:
-        return ImageFont.load_default()
+def _crop_box(vista: str) -> tuple[int, int, int, int]:
+    return CROP_BOXES.get(vista, CROP_BOXES["Anterior"])
 
 
-def _draw_centered_text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, font, fill):
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-    except Exception:
-        w, h = draw.textlength(text, font=font), 12
-    draw.text((xy[0] - w / 2, xy[1] - h / 2 - 1), text, font=font, fill=fill)
+def _to_crop_coords(vista: str, point: tuple[int, int]) -> tuple[int, int]:
+    x0, y0, _, _ = _crop_box(vista)
+    return point[0] - x0, point[1] - y0
 
 
-def _draw_body_base(draw: ImageDraw.ImageDraw):
-    outline = "#475569"
-    fill = "#d1d5db"
-    # Cabeza y cuello
-    draw.ellipse((124, 24, 196, 96), fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((144, 94, 176, 118), radius=10, fill=fill, outline=outline, width=3)
-    # Tronco/pelvis
-    draw.rounded_rectangle((108, 118, 212, 300), radius=42, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((120, 296, 200, 400), radius=28, fill=fill, outline=outline, width=3)
-    # Brazos
-    draw.rounded_rectangle((78, 128, 104, 260), radius=13, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((216, 128, 242, 260), radius=13, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((70, 254, 96, 374), radius=13, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((224, 254, 250, 374), radius=13, fill=fill, outline=outline, width=3)
-    # Piernas
-    draw.rounded_rectangle((116, 398, 148, 558), radius=15, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((172, 398, 204, 558), radius=15, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((116, 558, 148, 698), radius=15, fill=fill, outline=outline, width=3)
-    draw.rounded_rectangle((172, 558, 204, 698), radius=15, fill=fill, outline=outline, width=3)
-    # Pies
-    draw.ellipse((104, 696, 160, 730), fill=fill, outline=outline, width=3)
-    draw.ellipse((160, 696, 216, 730), fill=fill, outline=outline, width=3)
+def referencias_mapa_corporal(vista: str) -> list[str]:
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+    return list(_HOTSPOTS_FULL.get(vista, {}).keys())
+
+
+def obtener_zonas_mapa(vista: Any) -> list[str]:
+    vista_txt = s(vista)
+    return [""] + referencias_mapa_corporal(vista_txt)
 
 
 def crear_imagen_mapa_corporal(vista: str, selected_zone: str = "") -> Image.Image:
-    """Crea una imagen PIL con silueta corporal y puntos clickeables."""
+    """
+    Abre la imagen anatómica adjunta, recorta la vista anterior/posterior
+    y resalta la zona seleccionada.
+    """
     vista = vista if vista in VISTAS_CORPORALES else "Anterior"
-    img = Image.new("RGB", (360, 790), "#0f172a")
-    draw = ImageDraw.Draw(img)
-    font_title = _get_font(18)
-    font_small = _get_font(12)
-    font_marker = _get_font(15)
+    base = Image.open(MAPA_IMAGEN_PATH).convert("RGBA")
+    crop = base.crop(_crop_box(vista)).copy()
 
-    draw.text((18, 14), f"Mapa corporal {vista.lower()} clickeable", fill="#f8fafc", font=font_title)
-    draw.text((18, 42), "Haga clic sobre un punto numerado para seleccionar la localización.", fill="#cbd5e1", font=font_small)
+    if selected_zone and selected_zone in _HOTSPOTS_FULL.get(vista, {}):
+        draw = ImageDraw.Draw(crop)
+        for point in _HOTSPOTS_FULL[vista][selected_zone]:
+            cx, cy = _to_crop_coords(vista, point)
+            draw.ellipse((cx - 28, cy - 28, cx + 28, cy + 28), outline=(0, 180, 0, 255), width=8)
+            draw.ellipse((cx - 12, cy - 12, cx + 12, cy + 12), outline=(0, 180, 0, 255), width=4)
 
-    # Panel de silueta
-    draw.rounded_rectangle((20, 70, 340, 770), radius=16, fill="#e5e7eb", outline="#334155", width=2)
-    _draw_body_base(draw)
-
-    selected_num = _extraer_numero_zona(selected_zone)
-    zonas = MAPA_CORPORAL.get(vista, [])
-    for zona in zonas:
-        numero = _extraer_numero_zona(zona)
-        if numero is None:
-            continue
-        cx, cy = _HOTSPOTS[vista][numero]
-        selected = numero == selected_num
-        marker_fill = "#ef4444" if selected else "#f59e0b"
-        marker_outline = "#7f1d1d" if selected else "#111827"
-        text_fill = "#ffffff" if selected else "#111827"
-        r = 18 if selected else 16
-        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=marker_fill, outline=marker_outline, width=3)
-        _draw_centered_text(draw, (cx, cy), str(numero), font_marker, text_fill)
-
-    return img
+    return crop.convert("RGB")
 
 
-def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 28) -> str:
-    """Convierte un clic en coordenadas de imagen a la zona anatómica más cercana."""
+def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 75) -> str:
+    """
+    Convierte coordenadas del clic sobre la vista recortada en la zona anatómica más cercana.
+    """
     vista = vista if vista in VISTAS_CORPORALES else "Anterior"
     try:
         x_f = float(x)
@@ -273,26 +207,18 @@ def zona_desde_coordenadas(vista: str, x: Any, y: Any, radio_px: int = 28) -> st
     except Exception:
         return ""
 
-    mejor_num = None
+    mejor_zona = ""
     mejor_dist = 10**9
-    for numero, (cx, cy) in _HOTSPOTS.get(vista, {}).items():
-        dist = math.sqrt((x_f - cx) ** 2 + (y_f - cy) ** 2)
-        if dist < mejor_dist:
-            mejor_dist = dist
-            mejor_num = numero
 
-    if mejor_num is None or mejor_dist > radio_px:
-        return ""
+    for zona, points in _HOTSPOTS_FULL.get(vista, {}).items():
+        for full_point in points:
+            cx, cy = _to_crop_coords(vista, full_point)
+            dist = math.sqrt((x_f - cx) ** 2 + (y_f - cy) ** 2)
+            if dist < mejor_dist:
+                mejor_dist = dist
+                mejor_zona = zona
 
-    for zona in MAPA_CORPORAL.get(vista, []):
-        if _extraer_numero_zona(zona) == mejor_num:
-            return zona
-    return ""
-
-
-def referencias_mapa_corporal(vista: str) -> list[str]:
-    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
-    return MAPA_CORPORAL.get(vista, [])
+    return mejor_zona if mejor_dist <= radio_px else ""
 
 
 def puntaje_desde_opcion(opcion: Any) -> int:
@@ -314,14 +240,7 @@ def interpretar_braden(puntaje: int | None) -> dict:
     return {"riesgo": "Sin riesgo significativo", "nivel": "muy_bajo", "detalle": "Continuar vigilancia clínica habitual."}
 
 
-def calcular_braden(
-    percepcion: Any,
-    humedad: Any,
-    actividad: Any,
-    movilidad: Any,
-    nutricion: Any,
-    friccion: Any,
-) -> dict:
+def calcular_braden(percepcion: Any, humedad: Any, actividad: Any, movilidad: Any, nutricion: Any, friccion: Any) -> dict:
     componentes = {
         "Percepción sensorial": puntaje_desde_opcion(percepcion),
         "Humedad": puntaje_desde_opcion(humedad),
@@ -396,35 +315,8 @@ def formatear_lesion_upp(lesion: dict, indice: int) -> str:
 
 
 def formatear_bloque_upp(datos: dict) -> str:
-    estado_piel = s(datos.get("piel_estado"))
-    decubito = s(datos.get("decubito_actual"))
-    cambios = s(datos.get("cambios_posturales"))
-    superficie = s(datos.get("superficie_apoyo"))
-    medidas = datos.get("upp_medidas_prevencion", []) or []
-    conducta_general = s(datos.get("upp_conducta_general"))
     lesiones = datos.get("upp_lesiones", []) or []
-    braden = datos.get("braden_resultado", {}) or {}
-
     lineas = []
-    if estado_piel:
-        lineas.append(f"- Piel: {estado_piel}")
-
-    decubito_partes = []
-    if decubito:
-        decubito_partes.append(f"Decúbito actual: {decubito}")
-    if cambios:
-        decubito_partes.append(f"Cambios posturales: {cambios}")
-    if superficie:
-        decubito_partes.append(f"Superficie de apoyo: {superficie}")
-    if decubito_partes:
-        lineas.append("- " + " | ".join(decubito_partes))
-
-    puntaje = braden.get("puntaje")
-    if puntaje is not None:
-        lineas.append(f"- Braden: {puntaje}/23 - {braden.get('riesgo', 'No interpretado')}")
-
-    if medidas:
-        lineas.append("- Prevención UPP: " + " | ".join([s(m) for m in medidas if s(m)]))
 
     if lesiones:
         lineas.append("- Lesiones por presión / piel:")
@@ -432,9 +324,6 @@ def formatear_bloque_upp(datos: dict) -> str:
             lineas.append(formatear_lesion_upp(lesion, indice))
     else:
         lineas.append("- Lesiones por presión: no consignadas.")
-
-    if conducta_general:
-        lineas.append(f"- Conducta piel/UPP: {conducta_general}")
 
     if not lineas:
         return ""
