@@ -31,9 +31,6 @@ from modules.upp import (
     SUPERFICIES_APOYO,
     FRECUENCIAS_CAMBIO,
     calcular_braden,
-    limpiar_seleccion_svg,
-    render_svg_mapa_corporal,
-    resolver_seleccion_svg,
 )
 
 # Compatibilidad defensiva: evita que Streamlit falle si GitHub actualizó app.py
@@ -41,6 +38,7 @@ from modules.upp import (
 try:
     from modules.upp import (
         VISTAS_CORPORALES,
+        limpiar_seleccion_svg,
         render_svg_mapa_corporal,
         resolver_seleccion_svg,
         resumen_mapa_corporal,
@@ -61,7 +59,7 @@ except ImportError:
         st.session_state[f"upp_svg_sel_{state_key}"] = ""
 
     def render_svg_mapa_corporal(vista, state_key, selected_zone=""):
-        return "<div style='padding:12px;border:1px solid #cbd5e1;border-radius:10px'>Mapa SVG no disponible en este despliegue. Actualice modules/upp.py.</div>"
+        return "<div style='padding:12px;border:1px solid #cbd5e1;border-radius:10px'>Mapa SVG no disponible: actualice también modules/upp.py.</div>"
 
 from modules.validaciones import (
     calcular_par,
