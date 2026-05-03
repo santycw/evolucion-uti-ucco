@@ -39,7 +39,7 @@ try:
     from modules.upp import (
         VISTAS_CORPORALES,
         obtener_zonas_mapa,
-        render_silueta_corporal,
+        render_mapa_clickeable,
         resumen_mapa_corporal,
     )
 except ImportError:
@@ -92,6 +92,10 @@ except ImportError:
             "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
             "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
         }
+
+    def render_mapa_clickeable(vista, state_key):
+        zonas = obtener_zonas_mapa(vista)
+        return st.selectbox("Zona anatómica del mapa", zonas, key=f"{state_key}_fallback")
 
     def render_silueta_corporal(vista):
         zonas = _MAPA_CORPORAL_FALLBACK.get(str(vista or "Anterior"), _MAPA_CORPORAL_FALLBACK["Anterior"])
@@ -673,16 +677,16 @@ with tab_piel:
                 st.markdown(f"- **{componente}:** {valor} pts")
 
     with st.container(border=True):
-        st.subheader("🗺️ Mapa corporal visual de lesiones por presión / piel")
-        st.caption("Versión visual tipo silueta corporal anterior/posterior. Seleccione la vista y la zona numerada correspondiente para cada lesión. La localización se incorporará a la evolución final.")
+        st.subheader("🗺️ Mapa corporal clickeable de lesiones por presión / piel")
+        st.caption("Diseño interactivo: utilice el mapa corporal clickeable para seleccionar la localización anatómica de cada escara. Luego complete sus características para volcarlas en la evolución final.")
 
         mapa_resumen = resumen_mapa_corporal()
         mp1, mp2 = st.columns(2)
         with mp1:
-            st.markdown(render_silueta_corporal("Anterior"), unsafe_allow_html=True)
+            st.markdown("**Vista anterior**")
             st.caption(mapa_resumen.get("Anterior", ""))
         with mp2:
-            st.markdown(render_silueta_corporal("Posterior"), unsafe_allow_html=True)
+            st.markdown("**Vista posterior**")
             st.caption(mapa_resumen.get("Posterior", ""))
 
         cantidad_lesiones_upp = st.number_input(
@@ -697,13 +701,14 @@ with tab_piel:
         upp_lesiones = []
         for idx in range(int(cantidad_lesiones_upp)):
             with st.expander(f"Lesión {idx + 1}", expanded=True):
-                l1, l2, l3 = st.columns(3)
+                l1, l2 = st.columns(2)
                 vista = l1.selectbox("Vista corporal", VISTAS_CORPORALES, key=f"upp_vista_{idx}_{rk}")
-                zonas_vista = obtener_zonas_mapa(vista)
-                localizacion = l2.selectbox("Zona anatómica del mapa", zonas_vista, key=f"upp_loc_{idx}_{rk}")
-                lateralidad = l3.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
+                lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
 
-                st.markdown(render_silueta_corporal(vista), unsafe_allow_html=True)
+                localizacion = render_mapa_clickeable(vista, state_key=f"upp_mapa_{idx}_{rk}")
+                if not localizacion:
+                    st.warning("Seleccione una zona anatómica en el mapa corporal clickeable para esta lesión.")
+
                 estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
                 detalle_topografico = st.text_input(
                     "Detalle anatómico adicional (opcional)",
