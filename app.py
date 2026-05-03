@@ -34,85 +34,53 @@ from modules.upp import (
 )
 
 # Compatibilidad defensiva: evita que Streamlit falle si GitHub actualizó app.py
-# pero aún no desplegó el modules/upp.py nuevo con mapa corporal.
+# pero aún no desplegó el modules/upp.py nuevo con mapa corporal visual.
 try:
-    from modules.upp import VISTAS_CORPORALES, obtener_zonas_mapa, resumen_mapa_corporal
+    from modules.upp import (
+        VISTAS_CORPORALES,
+        obtener_zonas_mapa,
+        render_silueta_corporal,
+        resumen_mapa_corporal,
+    )
 except ImportError:
-    VISTAS_CORPORALES = [
-        "Anterior",
-        "Posterior",
-        "Lateral derecha",
-        "Lateral izquierda",
-        "Cabeza / cara / dispositivos",
-    ]
+    VISTAS_CORPORALES = ["Anterior", "Posterior"]
 
     _MAPA_CORPORAL_FALLBACK = {
         "Anterior": [
             "",
-            "Frente",
-            "Mentón",
-            "Tórax anterior",
-            "Mamas / pliegue submamario",
-            "Abdomen",
-            "Cresta ilíaca anterior",
-            "Rodilla",
-            "Tibia / cara anterior pierna",
-            "Dorso del pie",
-            "Dedos del pie",
-            "Otra localización",
+            "1. Frente / cara",
+            "2. Oreja / región malar",
+            "3. Hombro / clavícula",
+            "4. Tórax anterior",
+            "5. Mamas / pliegue submamario",
+            "6. Abdomen",
+            "7. Cresta ilíaca anterior",
+            "8. Periné / región inguinal",
+            "9. Muslo anterior",
+            "10. Rodilla",
+            "11. Tibia / cara anterior pierna",
+            "12. Maléolo medial",
+            "13. Dorso del pie",
+            "14. Dedos del pie",
+            "15. Otra localización anterior",
         ],
         "Posterior": [
             "",
-            "Occipital",
-            "Pabellón auricular",
-            "Escápula",
-            "Columna dorsal",
-            "Codo",
-            "Sacro",
-            "Cóccix",
-            "Glúteo",
-            "Isquion",
-            "Hueco poplíteo",
-            "Gemelos / pantorrilla",
-            "Talón",
-            "Planta del pie",
-            "Otra localización",
-        ],
-        "Lateral derecha": [
-            "",
-            "Hombro derecho",
-            "Costado torácico derecho",
-            "Trocánter derecho",
-            "Muslo lateral derecho",
-            "Rodilla lateral derecha",
-            "Maléolo externo derecho",
-            "Pie / borde externo derecho",
-            "Otra localización",
-        ],
-        "Lateral izquierda": [
-            "",
-            "Hombro izquierdo",
-            "Costado torácico izquierdo",
-            "Trocánter izquierdo",
-            "Muslo lateral izquierdo",
-            "Rodilla lateral izquierda",
-            "Maléolo externo izquierdo",
-            "Pie / borde externo izquierdo",
-            "Otra localización",
-        ],
-        "Cabeza / cara / dispositivos": [
-            "",
-            "Nariz / puente nasal",
-            "Labio / comisura",
-            "Mejilla",
-            "Cuero cabelludo",
-            "Cuello",
-            "Traqueostomía",
-            "Zona de máscara / VNI",
-            "Zona de tubo / fijación",
-            "Zona de CNG / SNG",
-            "Zona de catéter / dispositivo médico",
-            "Otra localización",
+            "1. Occipital",
+            "2. Pabellón auricular",
+            "3. Hombro / escápula",
+            "4. Columna dorsal",
+            "5. Codo / olécranon",
+            "6. Sacro / cóccix",
+            "7. Glúteo",
+            "8. Isquion",
+            "9. Trocánter",
+            "10. Muslo posterior",
+            "11. Hueco poplíteo",
+            "12. Gemelos / pantorrilla",
+            "13. Talón",
+            "14. Planta del pie",
+            "15. Otra localización posterior",
         ],
     }
 
@@ -121,12 +89,23 @@ except ImportError:
 
     def resumen_mapa_corporal():
         return {
-            "Anterior": "Frente, mentón, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, rodilla, tibia, dorso del pie, dedos.",
-            "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro, cóccix, glúteo, isquion, hueco poplíteo, gemelos, talón, planta.",
-            "Lateral derecha": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
-            "Lateral izquierda": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
-            "Cabeza / cara / dispositivos": "Nariz, labio, mejilla, cuero cabelludo, cuello, traqueostomía y zonas asociadas a dispositivos.",
+            "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
+            "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
         }
+
+    def render_silueta_corporal(vista):
+        zonas = _MAPA_CORPORAL_FALLBACK.get(str(vista or "Anterior"), _MAPA_CORPORAL_FALLBACK["Anterior"])
+        items = "".join(f"<li>{zona}</li>" for zona in zonas if zona)
+        return f"""
+        <div style='background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:10px'>
+            <div style='color:#f8fafc;font-weight:700;margin-bottom:8px'>Mapa corporal {str(vista or "Anterior").lower()}</div>
+            <div style='background:#ffffff;border-radius:10px;padding:12px;color:#111827;font-size:13px'>
+                <b>Zonas numeradas:</b>
+                <ol style='padding-left:18px;margin-top:8px'>{items}</ol>
+            </div>
+        </div>
+        """
+
 from modules.validaciones import (
     calcular_par,
     calcular_qtc_bazett,
