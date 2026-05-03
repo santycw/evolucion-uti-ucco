@@ -353,7 +353,7 @@ with tab_clinica:
                     rerun_app()
 
         st.caption("Invasiones / Accesos")
-        d1, d2, d3, d4, d5 = st.columns([1.35, 1.0, 1.0, 1.0, 1.0])
+        d1, d2, d3, d4, d5, d6 = st.columns([1.25, 1.35, 1.0, 1.0, 1.0, 1.0])
 
         cvc_tipo = d1.selectbox(
             "Tipo de CVC",
@@ -373,12 +373,37 @@ with tab_clinica:
             help="Seleccione únicamente si el paciente tiene CVC colocado.",
         )
 
+        cvc_ubicacion = ""
         cvc_fecha = None
         cvc_dias_auto = ""
         cvc_info = ""
 
         if cvc_tipo:
-            cvc_fecha = d2.date_input(
+            cvc_ubicacion = d2.selectbox(
+                "Ubicación CVC",
+                [
+                    "",
+                    "Yugular interna derecha",
+                    "Yugular interna izquierda",
+                    "Subclavia derecha",
+                    "Subclavia izquierda",
+                    "Femoral derecha",
+                    "Femoral izquierda",
+                    "PICC basílica derecha",
+                    "PICC basílica izquierda",
+                    "PICC cefálica derecha",
+                    "PICC cefálica izquierda",
+                    "PICC braquial derecha",
+                    "PICC braquial izquierda",
+                    "Port-a-cath subclavio derecho",
+                    "Port-a-cath subclavio izquierdo",
+                    "Otra ubicación",
+                ],
+                key=f"cvc_ubicacion_{rk}",
+                help="Seleccione el sitio anatómico del CVC.",
+            )
+
+            cvc_fecha = d3.date_input(
                 "Fecha CVC",
                 value=hoy,
                 max_value=hoy,
@@ -387,14 +412,18 @@ with tab_clinica:
             )
             cvc_dias_n = max((hoy - cvc_fecha).days + 1, 1)
             cvc_dias_auto = f"Día {cvc_dias_n}"
-            d2.caption(f"{cvc_dias_auto} de CVC")
-            cvc_info = f"{cvc_tipo}, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+            d3.caption(f"{cvc_dias_auto} de CVC")
+
+            if cvc_ubicacion:
+                cvc_info = f"{cvc_tipo} {cvc_ubicacion}, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+            else:
+                cvc_info = f"{cvc_tipo}, ubicación no consignada, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
         else:
             d2.caption("Sin CVC consignado")
 
-        ca_info = d3.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
-        sv_dias = d4.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d5.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+        ca_info = d4.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
+        sv_dias = d5.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = d6.text_input("SNG (Día)", key=f"sng_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
