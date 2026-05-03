@@ -1,8 +1,9 @@
 """
 Módulo UPP / decúbito / Braden.
 
-Centraliza opciones, cálculo de Braden y formateo del bloque de piel para
-mantener app.py como interfaz y preservar la generación estructurada.
+Centraliza opciones, cálculo de Braden, representación visual del mapa corporal
+(anterior/posterior) y formateo del bloque de piel para mantener app.py como
+interfaz y preservar la generación estructurada.
 """
 
 from __future__ import annotations
@@ -11,81 +12,46 @@ import re
 from typing import Any
 
 
-# --- MAPA CORPORAL SIMPLE ---
-VISTAS_CORPORALES = [
-    "Anterior",
-    "Posterior",
-    "Lateral derecha",
-    "Lateral izquierda",
-    "Cabeza / cara / dispositivos",
-]
+# --- MAPA CORPORAL VISUAL SIMPLE (ANTERIOR / POSTERIOR) ---
+VISTAS_CORPORALES = ["Anterior", "Posterior"]
 
 MAPA_CORPORAL = {
     "Anterior": [
-        "Frente",
-        "Mentón",
-        "Tórax anterior",
-        "Mamas / pliegue submamario",
-        "Abdomen",
-        "Cresta ilíaca anterior",
-        "Rodilla",
-        "Tibia / cara anterior pierna",
-        "Dorso del pie",
-        "Dedos del pie",
-        "Otra localización",
+        "1. Frente / cara",
+        "2. Oreja / región malar",
+        "3. Hombro / clavícula",
+        "4. Tórax anterior",
+        "5. Mamas / pliegue submamario",
+        "6. Abdomen",
+        "7. Cresta ilíaca anterior",
+        "8. Periné / región inguinal",
+        "9. Muslo anterior",
+        "10. Rodilla",
+        "11. Tibia / cara anterior pierna",
+        "12. Maléolo medial",
+        "13. Dorso del pie",
+        "14. Dedos del pie",
+        "15. Otra localización anterior",
     ],
     "Posterior": [
-        "Occipital",
-        "Pabellón auricular",
-        "Escápula",
-        "Columna dorsal",
-        "Codo",
-        "Sacro",
-        "Cóccix",
-        "Glúteo",
-        "Isquion",
-        "Hueco poplíteo",
-        "Gemelos / pantorrilla",
-        "Talón",
-        "Planta del pie",
-        "Otra localización",
-    ],
-    "Lateral derecha": [
-        "Hombro derecho",
-        "Costado torácico derecho",
-        "Trocánter derecho",
-        "Muslo lateral derecho",
-        "Rodilla lateral derecha",
-        "Maléolo externo derecho",
-        "Pie / borde externo derecho",
-        "Otra localización",
-    ],
-    "Lateral izquierda": [
-        "Hombro izquierdo",
-        "Costado torácico izquierdo",
-        "Trocánter izquierdo",
-        "Muslo lateral izquierdo",
-        "Rodilla lateral izquierda",
-        "Maléolo externo izquierdo",
-        "Pie / borde externo izquierdo",
-        "Otra localización",
-    ],
-    "Cabeza / cara / dispositivos": [
-        "Nariz / puente nasal",
-        "Labio / comisura",
-        "Mejilla",
-        "Cuero cabelludo",
-        "Cuello",
-        "Traqueostomía",
-        "Zona de máscara / VNI",
-        "Zona de tubo / fijación",
-        "Zona de CNG / SNG",
-        "Zona de catéter / dispositivo médico",
-        "Otra localización",
+        "1. Occipital",
+        "2. Pabellón auricular",
+        "3. Hombro / escápula",
+        "4. Columna dorsal",
+        "5. Codo / olécranon",
+        "6. Sacro / cóccix",
+        "7. Glúteo",
+        "8. Isquion",
+        "9. Trocánter",
+        "10. Muslo posterior",
+        "11. Hueco poplíteo",
+        "12. Gemelos / pantorrilla",
+        "13. Talón",
+        "14. Planta del pie",
+        "15. Otra localización posterior",
     ],
 }
 
-LOCALIZACIONES_UPP = ["", *sorted({zona for zonas in MAPA_CORPORAL.values() for zona in zonas if zona != "Otra localización"}), "Otra localización"]
 LATERALIDADES_UPP = ["", "Derecha", "Izquierda", "Bilateral", "Medial / central", "No aplica"]
 
 ESTADIOS_UPP = [
@@ -159,36 +125,114 @@ BRADEN_FRICCION = [
 
 
 def s(valor: Any) -> str:
-    """String seguro para campos opcionales."""
     return str(valor or "").strip()
 
 
 def obtener_zonas_mapa(vista: Any) -> list[str]:
-    """Devuelve las zonas anatómicas disponibles para la vista elegida."""
     vista_txt = s(vista)
     zonas = MAPA_CORPORAL.get(vista_txt, [])
     return [""] + zonas if zonas else [""]
 
 
 def resumen_mapa_corporal() -> dict[str, str]:
-    """Resumen breve del mapa corporal para mostrar en la UI."""
     return {
-        "Anterior": "Frente, mentón, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, rodilla, tibia, dorso del pie, dedos.",
-        "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro, cóccix, glúteo, isquion, hueco poplíteo, gemelos, talón, planta.",
-        "Lateral derecha": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
-        "Lateral izquierda": "Hombro, costado torácico, trocánter, muslo lateral, rodilla lateral, maléolo externo, borde externo del pie.",
-        "Cabeza / cara / dispositivos": "Nariz, labio, mejilla, cuero cabelludo, cuello, traqueostomía y zonas asociadas a dispositivos.",
+        "Anterior": "Cara, hombro/clavícula, tórax anterior, pliegue submamario, abdomen, cresta ilíaca anterior, periné, muslo anterior, rodilla, tibia, maléolo medial, dorso y dedos del pie.",
+        "Posterior": "Occipital, pabellón auricular, escápula, columna dorsal, codo, sacro/cóccix, glúteo, isquion, trocánter, muslo posterior, hueco poplíteo, pantorrilla, talón y planta del pie.",
     }
 
 
+def _circle(cx: int, cy: int, n: int) -> str:
+    return f"<circle cx='{cx}' cy='{cy}' r='10' fill='#f59e0b' stroke='#111827' stroke-width='1.5'></circle><text x='{cx}' y='{cy+4}' text-anchor='middle' font-size='11' font-family='Arial' fill='#111827' font-weight='700'>{n}</text>"
+
+
+def _legend_html(vista: str) -> str:
+    zonas = MAPA_CORPORAL.get(vista, [])
+    items = "".join([f"<li style='margin-bottom:3px'>{zona}</li>" for zona in zonas])
+    return f"<div style='font-size:12px; line-height:1.25'><b>Zonas {vista.lower()}</b><ol style='padding-left:18px; margin-top:8px'>{items}</ol></div>"
+
+
+def render_silueta_corporal(vista: str) -> str:
+    """Devuelve HTML/SVG de una silueta corporal estilizada con zonas numeradas."""
+    vista = vista if vista in VISTAS_CORPORALES else "Anterior"
+
+    if vista == "Anterior":
+        markers = "".join([
+            _circle(120, 38, 1),
+            _circle(155, 62, 2),
+            _circle(80, 92, 3),
+            _circle(120, 116, 4),
+            _circle(120, 142, 5),
+            _circle(120, 170, 6),
+            _circle(120, 202, 7),
+            _circle(120, 236, 8),
+            _circle(96, 292, 9),
+            _circle(96, 354, 10),
+            _circle(96, 414, 11),
+            _circle(96, 468, 12),
+            _circle(96, 520, 13),
+            _circle(96, 548, 14),
+            _circle(182, 570, 15),
+        ])
+        title = "Silueta corporal anterior"
+    else:
+        markers = "".join([
+            _circle(120, 34, 1),
+            _circle(154, 58, 2),
+            _circle(76, 98, 3),
+            _circle(120, 126, 4),
+            _circle(74, 178, 5),
+            _circle(120, 222, 6),
+            _circle(120, 256, 7),
+            _circle(120, 286, 8),
+            _circle(168, 282, 9),
+            _circle(96, 326, 10),
+            _circle(96, 384, 11),
+            _circle(96, 432, 12),
+            _circle(96, 506, 13),
+            _circle(96, 542, 14),
+            _circle(182, 570, 15),
+        ])
+        title = "Silueta corporal posterior"
+
+    svg = f"""
+    <div style='display:flex; gap:16px; align-items:flex-start; background:#0f172a; border:1px solid #334155; border-radius:12px; padding:12px; margin-bottom:10px'>
+      <div style='min-width:250px'>
+        <div style='color:#f8fafc; font-size:14px; font-weight:700; margin-bottom:8px'>{title}</div>
+        <svg width='240' height='590' viewBox='0 0 240 590' xmlns='http://www.w3.org/2000/svg'>
+          <rect x='0' y='0' width='240' height='590' rx='12' fill='#e5e7eb'/>
+          <g opacity='0.96'>
+            <circle cx='120' cy='46' r='28' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='108' y='72' width='24' height='16' rx='8' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='82' y='92' width='76' height='116' rx='34' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='92' y='205' width='56' height='78' rx='24' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='60' y='95' width='20' height='96' rx='10' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='160' y='95' width='20' height='96' rx='10' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='54' y='186' width='18' height='92' rx='9' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='168' y='186' width='18' height='92' rx='9' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='88' y='280' width='24' height='122' rx='12' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='128' y='280' width='24' height='122' rx='12' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='88' y='402' width='24' height='122' rx='12' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <rect x='128' y='402' width='24' height='122' rx='12' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <ellipse cx='100' cy='542' rx='18' ry='10' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+            <ellipse cx='140' cy='542' rx='18' ry='10' fill='#cbd5e1' stroke='#475569' stroke-width='2'/>
+          </g>
+          {markers}
+        </svg>
+      </div>
+      <div style='flex:1; background:#ffffff; border-radius:10px; padding:12px; border:1px solid #cbd5e1'>
+        {_legend_html(vista)}
+      </div>
+    </div>
+    """
+    return svg
+
+
 def puntaje_desde_opcion(opcion: Any) -> int:
-    """Extrae el puntaje inicial de una opción tipo '3 - texto'."""
     match = re.match(r"\s*(\d+)", str(opcion or ""))
     return int(match.group(1)) if match else 0
 
 
 def interpretar_braden(puntaje: int | None) -> dict:
-    """Interpreta Braden con categorías habituales de riesgo."""
     if puntaje is None or puntaje <= 0:
         return {"riesgo": "No calculado", "nivel": "info", "detalle": "Complete los 6 dominios de Braden."}
     if puntaje <= 9:
@@ -202,15 +246,7 @@ def interpretar_braden(puntaje: int | None) -> dict:
     return {"riesgo": "Sin riesgo significativo", "nivel": "muy_bajo", "detalle": "Continuar vigilancia clínica habitual."}
 
 
-def calcular_braden(
-    percepcion: Any,
-    humedad: Any,
-    actividad: Any,
-    movilidad: Any,
-    nutricion: Any,
-    friccion: Any,
-) -> dict:
-    """Calcula Braden total y devuelve componentes e interpretación."""
+def calcular_braden(percepcion: Any, humedad: Any, actividad: Any, movilidad: Any, nutricion: Any, friccion: Any) -> dict:
     componentes = {
         "Percepción sensorial": puntaje_desde_opcion(percepcion),
         "Humedad": puntaje_desde_opcion(humedad),
@@ -239,7 +275,6 @@ def formatear_dimensiones(largo: Any, ancho: Any, profundidad: Any) -> str:
 
 
 def formatear_lesion_upp(lesion: dict, indice: int) -> str:
-    """Devuelve una línea clínica para una lesión UPP."""
     encabezado = []
     vista = s(lesion.get("vista"))
     localizacion = s(lesion.get("localizacion"))
@@ -259,22 +294,17 @@ def formatear_lesion_upp(lesion: dict, indice: int) -> str:
         encabezado.append(estadio)
 
     detalle = []
-    dimensiones = formatear_dimensiones(
-        lesion.get("largo_cm"),
-        lesion.get("ancho_cm"),
-        lesion.get("profundidad_cm"),
-    )
+    dimensiones = formatear_dimensiones(lesion.get("largo_cm"), lesion.get("ancho_cm"), lesion.get("profundidad_cm"))
     if dimensiones:
         detalle.append(dimensiones)
 
-    campos = [
+    for nombre, valor in [
         ("lecho", lesion.get("lecho")),
         ("exudado", lesion.get("exudado")),
         ("piel perilesional", lesion.get("perilesional")),
         ("infección", lesion.get("infeccion")),
         ("dolor", lesion.get("dolor")),
-    ]
-    for nombre, valor in campos:
+    ]:
         if s(valor):
             detalle.append(f"{nombre}: {s(valor)}")
 
@@ -290,7 +320,6 @@ def formatear_lesion_upp(lesion: dict, indice: int) -> str:
 
 
 def formatear_bloque_upp(datos: dict) -> str:
-    """Construye el bloque PIEL / UPP / DECÚBITO para la evolución final."""
     estado_piel = s(datos.get("piel_estado"))
     decubito = s(datos.get("decubito_actual"))
     cambios = s(datos.get("cambios_posturales"))
@@ -301,7 +330,6 @@ def formatear_bloque_upp(datos: dict) -> str:
     braden = datos.get("braden_resultado", {}) or {}
 
     lineas = []
-
     if estado_piel:
         lineas.append(f"- Piel: {estado_piel}")
 
@@ -334,5 +362,4 @@ def formatear_bloque_upp(datos: dict) -> str:
 
     if not lineas:
         return ""
-
     return ">> PIEL / UPP / DECÚBITO:\n" + "\n".join(lineas) + "\n"

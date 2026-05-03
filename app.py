@@ -694,23 +694,17 @@ with tab_piel:
                 st.markdown(f"- **{componente}:** {valor} pts")
 
     with st.container(border=True):
-        st.subheader("🗺️ Mapa corporal de lesiones por presión / piel")
-        st.caption("Seleccione la vista corporal y luego la zona anatómica del mapa para cada lesión. Esto se volcará automáticamente en la evolución final.")
+        st.subheader("🗺️ Mapa corporal visual de lesiones por presión / piel")
+        st.caption("Versión visual tipo silueta corporal anterior/posterior. Seleccione la vista y la zona numerada correspondiente para cada lesión. La localización se incorporará a la evolución final.")
 
         mapa_resumen = resumen_mapa_corporal()
         mp1, mp2 = st.columns(2)
         with mp1:
-            st.markdown("**Vista anterior**")
+            st.markdown(render_silueta_corporal("Anterior"), unsafe_allow_html=True)
             st.caption(mapa_resumen.get("Anterior", ""))
-            st.markdown("**Vista lateral derecha**")
-            st.caption(mapa_resumen.get("Lateral derecha", ""))
-            st.markdown("**Vista lateral izquierda**")
-            st.caption(mapa_resumen.get("Lateral izquierda", ""))
         with mp2:
-            st.markdown("**Vista posterior**")
+            st.markdown(render_silueta_corporal("Posterior"), unsafe_allow_html=True)
             st.caption(mapa_resumen.get("Posterior", ""))
-            st.markdown("**Cabeza / cara / dispositivos**")
-            st.caption(mapa_resumen.get("Cabeza / cara / dispositivos", ""))
 
         cantidad_lesiones_upp = st.number_input(
             "Cantidad de lesiones a registrar",
@@ -730,6 +724,7 @@ with tab_piel:
                 localizacion = l2.selectbox("Zona anatómica del mapa", zonas_vista, key=f"upp_loc_{idx}_{rk}")
                 lateralidad = l3.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
 
+                st.markdown(render_silueta_corporal(vista), unsafe_allow_html=True)
                 estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
                 detalle_topografico = st.text_input(
                     "Detalle anatómico adicional (opcional)",
