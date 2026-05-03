@@ -184,7 +184,7 @@ def _svg_hotspot(vista: str, zona: str, state_key: str, selected: bool) -> str:
     title = html.escape(_texto_zona_sin_numero(zona))
     href = html.escape(_build_pick_url(vista, zona, state_key), quote=True)
     return (
-        f"<a href='{href}' target='_self'>"
+        f"<a href='{href}' target='_top'>"
         f"<title>{title}</title>"
         f"<circle cx='{cx}' cy='{cy}' r='16' fill='{fill}' stroke='{stroke}' stroke-width='2'/>"
         f"<text x='{cx}' y='{cy + 5}' text-anchor='middle' font-family='Arial' font-size='14' font-weight='700' fill='{text_fill}'>{numero}</text>"

@@ -90,6 +90,13 @@ def rerun_app():
     else:
         st.experimental_rerun()
 
+def render_html_seguro(html: str):
+    """Renderiza HTML/SVG evitando que Streamlit lo muestre como texto plano."""
+    if hasattr(st, "html"):
+        st.html(html)
+    else:
+        st.markdown(html, unsafe_allow_html=True)
+
 rk = st.session_state['rk']
 
 # --- MÓDULOS V2.0: infusiones, terminología, validaciones, scores y evolución ---
@@ -658,7 +665,7 @@ with tab_piel:
 
                 svg_slot_key = f"{idx}_{rk}"
                 localizacion = resolver_seleccion_svg(vista, svg_slot_key)
-                st.markdown(render_svg_mapa_corporal(vista, svg_slot_key, localizacion), unsafe_allow_html=True)
+                render_html_seguro(render_svg_mapa_corporal(vista, svg_slot_key, localizacion))
                 info1, info2 = st.columns([5,1])
                 with info1:
                     if localizacion:
