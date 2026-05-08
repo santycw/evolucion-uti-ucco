@@ -11,7 +11,9 @@ from modules.infusiones import (
     construir_detalle_infusion,
     evaluar_rango_infusion,
     obtener_diccionario_drogas,
+    obtener_sugerencias_dilucion,
     requiere_confirmacion_extra,
+    texto_dilucion_sugerida,
     texto_rango_infusion,
 )
 from modules.scores import calcular_scores_contexto, formatear_scores_detectados, motor_scores
@@ -297,9 +299,39 @@ with tab_clinica:
             if info_droga.get("nota"):
                 st.caption(f"Nota de seguridad: {info_droga['nota']}")
 
+            sugerencias_dilucion = obtener_sugerencias_dilucion(droga_sel)
+            cant_amp_key = f"cant_amp_{rk}"
+            vol_ml_key = f"vol_ml_{rk}"
+
+            if sugerencias_dilucion:
+                opciones_dilucion = ["No aplicar sugerencia"] + [
+                    texto_dilucion_sugerida(s) for s in sugerencias_dilucion
+                ]
+                dilucion_sel = st.selectbox(
+                    "Dilución sugerida por nomograma",
+                    opciones_dilucion,
+                    key=f"dilucion_nomograma_{rk}",
+                    help="Sugerencias basadas en los nomogramas institucionales cargados. Verificar siempre con protocolo local/farmacia.",
+                )
+                if dilucion_sel != "No aplicar sugerencia":
+                    idx_sug = opciones_dilucion.index(dilucion_sel) - 1
+                    sugerencia = sugerencias_dilucion[idx_sug]
+                    st.info(
+                        f"**Sugerencia:** {sugerencia.get('nombre')} | "
+                        f"Diluyente: {sugerencia.get('diluyente')} | "
+                        f"Volumen final: {sugerencia.get('volumen_ml'):g} ml. "
+                        f"{sugerencia.get('nota', '')}"
+                    )
+                    if st.button("Aplicar dilución sugerida", key=f"aplicar_dilucion_{rk}"):
+                        st.session_state[cant_amp_key] = float(sugerencia.get("ampollas", 1.0))
+                        st.session_state[vol_ml_key] = float(sugerencia.get("volumen_ml", 100.0))
+                        rerun_app()
+            else:
+                st.caption("Sin dilución sugerida por nomograma para esta droga.")
+
             c_calc1, c_calc2 = st.columns(2)
-            cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5, key=f"cant_amp_{rk}")
-            volumen_ml = c_calc2.number_input("Volumen Dilución (ml)", min_value=0.0, value=100.0, step=10.0, key=f"vol_ml_{rk}")
+            cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5, key=cant_amp_key)
+            volumen_ml = c_calc2.number_input("Volumen final / Dilución (ml)", min_value=0.0, value=100.0, step=10.0, key=vol_ml_key)
 
             droga_mg = cant_ampollas * mg_base
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True, key=f"calc_modo_{rk}")

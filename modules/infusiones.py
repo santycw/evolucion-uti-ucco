@@ -24,7 +24,98 @@ DICCIONARIO_DROGAS: Dict[str, dict] = {
     "Nitroglicerina (25 mg/5 ml)": {"unidad": "mcg/min", "mg": 25.0, "rango": (5.0, 200.0), "critico_alto": 400.0, "nota": "Vasodilatador. Titular según TA/dolor/isquemia; usar bomba."},
     "Nitroprusiato de sodio (50 mg)": {"unidad": "mcg/kg/min", "mg": 50.0, "rango": (0.3, 10.0), "critico_alto": 10.0, "nota": "Proteger de luz. Riesgo de toxicidad por cianuro/tiocianato."},
     "Isoproterenol (1 mg/5 ml)": {"unidad": "mcg/min", "mg": 1.0, "rango": (0.5, 20.0), "critico_alto": 20.0, "nota": "Cronotrópico. Vigilar taquiarritmias, isquemia e hipotensión."},
+
+    "Propofol 2% (1000 mg/50 ml)": {"unidad": "mg/kg/h", "mg": 1000.0, "rango": (0.3, 3.0), "critico_alto": 4.0, "nota": "Propofol 2%. Reemplazar frasco ampolla a las 12 h según nomograma institucional."},
+    "Lorazepam (4 mg)": {"unidad": "mg/kg/h", "mg": 4.0, "rango": (0.01, 0.1), "critico_alto": 0.2, "nota": "Proteger de la luz. No usar envases de PVC. Vigilar acumulación/sedación."},
+    "Clonidina (0.15 mg)": {"unidad": "mcg/kg/h", "mg": 0.15, "rango": (0.5, 2.0), "critico_alto": 2.5, "nota": "Proteger de la luz. Vigilar bradicardia e hipotensión."},
+    "Vecuronio (10 mg)": {"unidad": "mcg/kg/h", "mg": 10.0, "rango": (48.0, 72.0), "critico_alto": 100.0, "nota": "Bloqueante neuromuscular. Reconstituir cada frasco con 10 ml de agua destilada."},
+    "Rocuronio (50 mg)": {"unidad": "mcg/kg/min", "mg": 50.0, "rango": (8.0, 12.0), "critico_alto": 15.0, "nota": "Bloqueante neuromuscular. Usar con sedoanalgesia adecuada y monitoreo."},
 }
+
+
+# Sugerencias de dilución basadas en "Nomogramas para la dilución y administración
+# de analgésicos, sedantes y bloqueantes neuromusculares en infusión continua",
+# actualización 14/10/2020.
+#
+# Campos:
+# - ampollas: cantidad sugerida de ampollas/frascos.
+# - volumen_ml: volumen final recomendado por el nomograma para usar en la calculadora.
+# - diluyente: diluyente o forma de preparación.
+# - nota: aclaraciones de estabilidad/seguridad.
+NOMOGRAMAS_DILUCION: Dict[str, list[dict]] = {
+    "Fentanilo (0.25 mg)": [
+        {"nombre": "Estándar: 10 ampollas + 100 ml SF", "ampollas": 10.0, "volumen_ml": 150.0, "diluyente": "SF 0,9%", "nota": "Volumen final 150 ml. Rango recomendado 0,7-5 mcg/kg/h; casos especiales hasta 10 mcg/kg/h."},
+        {"nombre": "Restricción de volumen: 3 ampollas + 100 ml SF", "ampollas": 3.0, "volumen_ml": 115.0, "diluyente": "SF 0,9%", "nota": "Volumen final 115 ml."},
+        {"nombre": "Fentanilo puro: 20 ampollas en bolsa vacía", "ampollas": 20.0, "volumen_ml": 100.0, "diluyente": "Bolsa vacía", "nota": "Opción concentrada según nomograma de fentanilo puro."},
+    ],
+    "Remifentanilo (5 mg)": [
+        {"nombre": "Estándar: 2 frascos ampolla + 100 ml SF", "ampollas": 2.0, "volumen_ml": 110.0, "diluyente": "SF 0,9%", "nota": "Volumen final 110 ml. Reconstituir cada frasco ampolla con agua destilada. Rango recomendado 3-15 mcg/kg/h."},
+        {"nombre": "Alternativa: 1 frasco ampolla + 100 ml SF", "ampollas": 1.0, "volumen_ml": 105.0, "diluyente": "SF 0,9%", "nota": "Volumen final 105 ml. Reconstituir antes de diluir."},
+    ],
+    "Morfina (10 mg)": [
+        {"nombre": "Estándar: 10 ampollas + 100 ml SF", "ampollas": 10.0, "volumen_ml": 110.0, "diluyente": "SF 0,9%", "nota": "Volumen final 110 ml. Rango recomendado 0,07-0,5 mg/kg/h."},
+        {"nombre": "Alternativa: 3 ampollas + 100 ml SF", "ampollas": 3.0, "volumen_ml": 103.0, "diluyente": "SF 0,9%", "nota": "Volumen final 103 ml."},
+    ],
+    "Ketamina (500 mg)": [
+        {"nombre": "Estándar: 1 frasco ampolla en 500 ml SF", "ampollas": 1.0, "volumen_ml": 510.0, "diluyente": "SF 0,9%", "nota": "Volumen final 510 ml. Descartar remanente luego de 24 h. Rango recomendado 0,05-1,2 mg/kg/h."},
+    ],
+    "Midazolam (15 mg)": [
+        {"nombre": "Estándar: 8 ampollas + 100 ml SF", "ampollas": 8.0, "volumen_ml": 124.0, "diluyente": "SF 0,9%", "nota": "Volumen final 124 ml. Rango recomendado 0,02-0,2 mg/kg/h."},
+        {"nombre": "Alternativa: 4 ampollas + 100 ml SF", "ampollas": 4.0, "volumen_ml": 112.0, "diluyente": "SF 0,9%", "nota": "Volumen final 112 ml."},
+        {"nombre": "Alternativa: 2 ampollas + 100 ml SF", "ampollas": 2.0, "volumen_ml": 106.0, "diluyente": "SF 0,9%", "nota": "Volumen final 106 ml."},
+        {"nombre": "Midazolam puro: 10 ampollas en bolsa vacía", "ampollas": 10.0, "volumen_ml": 30.0, "diluyente": "Bolsa vacía", "nota": "Opción concentrada del nomograma de midazolam puro."},
+    ],
+    "Midazolam (50 mg)": [
+        {"nombre": "Estándar: 3 ampollas + 100 ml SF", "ampollas": 3.0, "volumen_ml": 130.0, "diluyente": "SF 0,9%", "nota": "Volumen final 130 ml. Rango recomendado 0,02-0,2 mg/kg/h."},
+        {"nombre": "Alternativa: 2 ampollas + 100 ml SF", "ampollas": 2.0, "volumen_ml": 120.0, "diluyente": "SF 0,9%", "nota": "Volumen final 120 ml."},
+        {"nombre": "Alternativa: 1 ampolla + 100 ml SF", "ampollas": 1.0, "volumen_ml": 110.0, "diluyente": "SF 0,9%", "nota": "Volumen final 110 ml. Descartar solución a las 24 h."},
+    ],
+    "Propofol 2% (1000 mg/50 ml)": [
+        {"nombre": "Frasco ampolla listo para infusión", "ampollas": 1.0, "volumen_ml": 50.0, "diluyente": "Sin diluir", "nota": "Indicar 1 frasco ampolla. Reemplazar frasco ampolla a las 12 h. Rango recomendado 0,3-3 mg/kg/h."},
+    ],
+    "Propofol 1% (200 mg)": [
+        {"nombre": "Estándar: 4 ampollas en bolsa vacía", "ampollas": 4.0, "volumen_ml": 80.0, "diluyente": "Bolsa vacía", "nota": "No agregar diluyente. Rango recomendado 0,3-3 mg/kg/h."},
+        {"nombre": "Alternativa: 2 ampollas en bolsa vacía", "ampollas": 2.0, "volumen_ml": 40.0, "diluyente": "Bolsa vacía", "nota": "No agregar diluyente."},
+        {"nombre": "Alternativa: 1 ampolla en bolsa vacía", "ampollas": 1.0, "volumen_ml": 20.0, "diluyente": "Bolsa vacía", "nota": "No agregar diluyente."},
+    ],
+    "Dexmedetomidina (0.2 mg)": [
+        {"nombre": "Estándar: 2 frascos ampolla + 100 ml SF", "ampollas": 2.0, "volumen_ml": 104.0, "diluyente": "SF 0,9%", "nota": "Volumen final 104 ml. Rango recomendado 0,2-1,4 mcg/kg/h."},
+        {"nombre": "Alternativa: 1 frasco ampolla + 50 ml SF", "ampollas": 1.0, "volumen_ml": 52.0, "diluyente": "SF 0,9%", "nota": "Volumen final 52 ml."},
+    ],
+    "Lorazepam (4 mg)": [
+        {"nombre": "Estándar: 10 ampollas + 30 ml DX5%", "ampollas": 10.0, "volumen_ml": 40.0, "diluyente": "Dextrosa 5%", "nota": "Volumen final 40 ml. Proteger de la luz. No usar envases de PVC. Rango recomendado 0,01-0,1 mg/kg/h."},
+        {"nombre": "Alternativa: 2 ampollas + 100 ml DX5%", "ampollas": 2.0, "volumen_ml": 102.0, "diluyente": "Dextrosa 5%", "nota": "Volumen final 102 ml. Proteger de la luz."},
+    ],
+    "Clonidina (0.15 mg)": [
+        {"nombre": "Estándar: 6 ampollas + 100 ml SF", "ampollas": 6.0, "volumen_ml": 106.0, "diluyente": "SF 0,9%", "nota": "Volumen final 106 ml. Proteger de la luz. Rango recomendado 0,5-2 mcg/kg/h."},
+        {"nombre": "Alternativa: 2 ampollas + 100 ml SF", "ampollas": 2.0, "volumen_ml": 102.0, "diluyente": "SF 0,9%", "nota": "Volumen final 102 ml. Proteger de la luz."},
+    ],
+    "Atracurio (50 mg)": [
+        {"nombre": "Estándar: 10 ampollas + 100 ml SF", "ampollas": 10.0, "volumen_ml": 150.0, "diluyente": "SF 0,9%", "nota": "Volumen final 150 ml. Rango recomendado 5-20 mcg/kg/min."},
+    ],
+    "Vecuronio (10 mg)": [
+        {"nombre": "Estándar: 5 frascos ampolla + 100 ml SF", "ampollas": 5.0, "volumen_ml": 150.0, "diluyente": "SF 0,9%", "nota": "Volumen final 150 ml. Reconstituir cada frasco con 10 ml de agua destilada. Rango recomendado 48-72 mcg/kg/h."},
+    ],
+    "Pancuronio (4 mg)": [
+        {"nombre": "Estándar: 10 ampollas + 100 ml SF", "ampollas": 10.0, "volumen_ml": 120.0, "diluyente": "SF 0,9%", "nota": "Volumen final 120 ml. Rango recomendado 0,06-0,12 mg/kg/h."},
+    ],
+    "Rocuronio (50 mg)": [
+        {"nombre": "Estándar: 4 ampollas + 100 ml SF", "ampollas": 4.0, "volumen_ml": 120.0, "diluyente": "SF 0,9%", "nota": "Volumen final 120 ml. Rango recomendado 8-12 mcg/kg/min."},
+    ],
+}
+
+def obtener_sugerencias_dilucion(nombre_droga: str) -> list[dict]:
+    """Devuelve sugerencias de dilución configuradas por nomograma para la droga seleccionada."""
+    return deepcopy(NOMOGRAMAS_DILUCION.get(nombre_droga, []))
+
+def texto_dilucion_sugerida(sugerencia: dict) -> str:
+    """Texto corto para mostrar una dilución sugerida."""
+    return (
+        f"{sugerencia.get('nombre', 'Dilución sugerida')} · "
+        f"{sugerencia.get('ampollas', 0):g} amp/FA · "
+        f"vol final {sugerencia.get('volumen_ml', 0):g} ml"
+    )
+
 
 def obtener_diccionario_drogas() -> Dict[str, dict]:
     return deepcopy(DICCIONARIO_DROGAS)
