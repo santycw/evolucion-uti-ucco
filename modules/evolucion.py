@@ -296,6 +296,7 @@ Invasiones: CVC: {datos.get('cvc_info')} | Cat.Art: {datos.get('ca_info')} | SV:
 - ABD/RENAL: {datos.get('ex_abd')} | Ex. Renal: {datos.get('ex_renal')}{nutri_txt}{balance_txt}
 
 {bloque_piel_upp}>> LABORATORIO Y MEDIO INTERNO:
+>> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
 {bloque_estudios}
 >> FAST HUG BID:
