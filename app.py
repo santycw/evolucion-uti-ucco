@@ -1,4 +1,9 @@
 import streamlit as st
+
+try:
+    from streamlit_image_coordinates import streamlit_image_coordinates
+except ImportError:
+    streamlit_image_coordinates = None
 import datetime
 from modules.evolucion import generar_texto_evolucion
 from modules.infusiones import (
@@ -6,12 +11,40 @@ from modules.infusiones import (
     construir_detalle_infusion,
     evaluar_rango_infusion,
     obtener_diccionario_drogas,
+    obtener_sugerencias_dilucion,
     requiere_confirmacion_extra,
+    texto_dilucion_sugerida,
     texto_rango_infusion,
 )
 from modules.scores import calcular_scores_contexto, formatear_scores_detectados, motor_scores
 from modules.scores_catalog import agrupar_catalogo_por_categoria, resumen_estado_catalogo
 from modules.terminologia import cargar_diccionario_medico, detectar_en_db, normalizar_texto_medico
+from modules.upp import (
+    BRADEN_ACTIVIDAD,
+    BRADEN_FRICCION,
+    BRADEN_HUMEDAD,
+    BRADEN_MOVILIDAD,
+    BRADEN_NUTRICION,
+    BRADEN_PERCEPCION,
+    DECUBITOS,
+    DOLOR_UPP,
+    ESTADIOS_UPP,
+    EXUDADOS_UPP,
+    INFECCION_UPP,
+    LATERALIDADES_UPP,
+    LECHOS_UPP,
+    MEDIDAS_PREVENCION,
+    PERILESIONAL_UPP,
+    SUPERFICIES_APOYO,
+    FRECUENCIAS_CAMBIO,
+    VISTAS_CORPORALES,
+    calcular_braden,
+    crear_imagen_mapa_corporal,
+    referencias_mapa_corporal,
+    resumen_mapa_corporal,
+    zona_desde_coordenadas,
+)
+
 from modules.validaciones import (
     calcular_par,
     calcular_qtc_bazett,
@@ -34,6 +67,8 @@ def d_str(valor_default):
     """Retorna un string vacío si la orden de limpieza global está activa."""
     return "" if st.session_state.get('limpiar_prellenado', False) else valor_default
 
+rk = st.session_state['rk']
+
 def rerun_app():
     """Reejecuta la app manteniendo compatibilidad con versiones de Streamlit."""
     if hasattr(st, "rerun"):
@@ -41,10 +76,6 @@ def rerun_app():
     else:
         st.experimental_rerun()
 
-rk = st.session_state['rk']
-
-# --- MÓDULOS V2.0: infusiones, terminología, validaciones, scores y evolución ---
-# Configuración de página
 st.set_page_config(page_title="Sistema Evolutivo UTI", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
 # --- CSS PERSONALIZADO ---
@@ -241,10 +272,11 @@ if is_fa:
 st.divider()
 
 # --- CUERPO PRINCIPAL ---
-tab_clinica, tab_lab, tab_estudios, tab_planes = st.tabs([
+tab_clinica, tab_lab, tab_estudios, tab_piel, tab_planes = st.tabs([
     "🩺 Clínica y Examen",
     "🧪 Laboratorio Integral",
     "🩻 ECG y Estudios",
+    "🩹 Piel / UPP / Decúbito",
     "📋 Plan y FAST-HUG"
 ])
 
@@ -267,9 +299,39 @@ with tab_clinica:
             if info_droga.get("nota"):
                 st.caption(f"Nota de seguridad: {info_droga['nota']}")
 
+            sugerencias_dilucion = obtener_sugerencias_dilucion(droga_sel)
+            cant_amp_key = f"cant_amp_{rk}"
+            vol_ml_key = f"vol_ml_{rk}"
+
+            if sugerencias_dilucion:
+                opciones_dilucion = ["No aplicar sugerencia"] + [
+                    texto_dilucion_sugerida(s) for s in sugerencias_dilucion
+                ]
+                dilucion_sel = st.selectbox(
+                    "Dilución sugerida por nomograma",
+                    opciones_dilucion,
+                    key=f"dilucion_nomograma_{rk}",
+                    help="Sugerencias basadas en los nomogramas institucionales cargados. Verificar siempre con protocolo local/farmacia.",
+                )
+                if dilucion_sel != "No aplicar sugerencia":
+                    idx_sug = opciones_dilucion.index(dilucion_sel) - 1
+                    sugerencia = sugerencias_dilucion[idx_sug]
+                    st.info(
+                        f"**Sugerencia:** {sugerencia.get('nombre')} | "
+                        f"Diluyente: {sugerencia.get('diluyente')} | "
+                        f"Volumen final: {sugerencia.get('volumen_ml'):g} ml. "
+                        f"{sugerencia.get('nota', '')}"
+                    )
+                    if st.button("Aplicar dilución sugerida", key=f"aplicar_dilucion_{rk}"):
+                        st.session_state[cant_amp_key] = float(sugerencia.get("ampollas", 1.0))
+                        st.session_state[vol_ml_key] = float(sugerencia.get("volumen_ml", 100.0))
+                        rerun_app()
+            else:
+                st.caption("Sin dilución sugerida por nomograma para esta droga.")
+
             c_calc1, c_calc2 = st.columns(2)
-            cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5, key=f"cant_amp_{rk}")
-            volumen_ml = c_calc2.number_input("Volumen Dilución (ml)", min_value=0.0, value=100.0, step=10.0, key=f"vol_ml_{rk}")
+            cant_ampollas = c_calc1.number_input("Cantidad Ampollas", min_value=0.0, value=1.0, step=0.5, key=cant_amp_key)
+            volumen_ml = c_calc2.number_input("Volumen final / Dilución (ml)", min_value=0.0, value=100.0, step=10.0, key=vol_ml_key)
 
             droga_mg = cant_ampollas * mg_base
             calc_modo = st.radio("Dirección del cálculo", [f"Calcular DOSIS ({unidad_activa})", "Calcular VELOCIDAD (ml/h)"], horizontal=True, key=f"calc_modo_{rk}")
@@ -323,11 +385,77 @@ with tab_clinica:
                     rerun_app()
 
         st.caption("Invasiones / Accesos")
-        d1, d2, d3, d4 = st.columns(4)
-        cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
-        ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
-        sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+        d1, d2, d3, d4, d5, d6 = st.columns([1.25, 1.35, 1.0, 1.0, 1.0, 1.0])
+
+        cvc_tipo = d1.selectbox(
+            "Tipo de CVC",
+            [
+                "",
+                "CVC convencional",
+                "CVC bilumen",
+                "CVC trilumen",
+                "PICC",
+                "Introductor venoso central",
+                "Catéter de hemodiálisis / Shaldon",
+                "Port-a-cath",
+                "Swan-Ganz",
+                "Otro CVC",
+            ],
+            key=f"cvc_tipo_{rk}",
+            help="Seleccione únicamente si el paciente tiene CVC colocado.",
+        )
+
+        cvc_ubicacion = ""
+        cvc_fecha = None
+        cvc_dias_auto = ""
+        cvc_info = ""
+
+        if cvc_tipo:
+            cvc_ubicacion = d2.selectbox(
+                "Ubicación CVC",
+                [
+                    "",
+                    "Yugular interna derecha",
+                    "Yugular interna izquierda",
+                    "Subclavia derecha",
+                    "Subclavia izquierda",
+                    "Femoral derecha",
+                    "Femoral izquierda",
+                    "PICC basílica derecha",
+                    "PICC basílica izquierda",
+                    "PICC cefálica derecha",
+                    "PICC cefálica izquierda",
+                    "PICC braquial derecha",
+                    "PICC braquial izquierda",
+                    "Port-a-cath subclavio derecho",
+                    "Port-a-cath subclavio izquierdo",
+                    "Otra ubicación",
+                ],
+                key=f"cvc_ubicacion_{rk}",
+                help="Seleccione el sitio anatómico del CVC.",
+            )
+
+            cvc_fecha = d3.date_input(
+                "Fecha CVC",
+                value=hoy,
+                max_value=hoy,
+                format="DD/MM/YYYY",
+                key=f"cvc_fecha_{rk}",
+            )
+            cvc_dias_n = max((hoy - cvc_fecha).days + 1, 1)
+            cvc_dias_auto = f"Día {cvc_dias_n}"
+            d3.caption(f"{cvc_dias_auto} de CVC")
+
+            if cvc_ubicacion:
+                cvc_info = f"{cvc_tipo} {cvc_ubicacion}, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+            else:
+                cvc_info = f"{cvc_tipo}, ubicación no consignada, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+        else:
+            d2.caption("Sin CVC consignado")
+
+        ca_info = d4.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
+        sv_dias = d5.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = d6.text_input("SNG (Día)", key=f"sng_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -357,12 +485,55 @@ with tab_clinica:
     with st.container(border=True):
         st.subheader("2. Respiratorio y ARM")
         r_b1, r_b2, r_b3 = st.columns(3)
+        FIO2_AUTOMATICA_DISPOSITIVO = {
+            "Máscara Venturi 24%": 24,
+            "Máscara Venturi 28%": 28,
+            "Máscara Venturi 31%": 31,
+            "Máscara Venturi 35%": 35,
+            "Máscara Venturi 40%": 40,
+            "Máscara Venturi 50%": 50,
+        }
+
         if paciente_ventilado:
             via_aerea = r_b1.text_input("Vía Aérea", d_str("TOT"), key=f"va_{rk}")
         else:
-            via_aerea = r_b1.selectbox("Dispositivo O2", ["AA (Aire Ambiente)", "Cánula Nasal", "Máscara Venturi 24%", "Máscara Venturi 28%", "Máscara Venturi 31%", "Máscara Venturi 35%", "Máscara Venturi 40%", "Máscara Venturi 50%", "Máscara Reservorio", "CAF", "VNI", "TQTAA"], key=f"va_{rk}")
+            via_aerea = r_b1.selectbox(
+                "Dispositivo O2",
+                [
+                    "AA (Aire Ambiente)",
+                    "Cánula Nasal",
+                    "Máscara Venturi 24%",
+                    "Máscara Venturi 28%",
+                    "Máscara Venturi 31%",
+                    "Máscara Venturi 35%",
+                    "Máscara Venturi 40%",
+                    "Máscara Venturi 50%",
+                    "Máscara Reservorio",
+                    "CAF",
+                    "VNI",
+                    "TQTAA",
+                ],
+                key=f"va_{rk}",
+            )
 
-        fio2 = r_b2.number_input("FiO2 (%)", 21, 100, 21, key=f"fio2_{rk}")
+        fio2_key = f"fio2_{rk}"
+        fio2_auto = FIO2_AUTOMATICA_DISPOSITIVO.get(via_aerea)
+        if fio2_auto is not None:
+            st.session_state[fio2_key] = fio2_auto
+        elif fio2_key not in st.session_state:
+            st.session_state[fio2_key] = 21
+
+        fio2 = r_b2.number_input(
+            "FiO2 (%)",
+            21,
+            100,
+            key=fio2_key,
+            disabled=fio2_auto is not None,
+            help="En máscaras Venturi se completa automáticamente según el dispositivo seleccionado.",
+        )
+        if fio2_auto is not None:
+            r_b2.caption(f"FiO₂ automática por {via_aerea}: {fio2_auto}%")
+
         pafi_manual = r_b3.text_input("PaFiO2 (Opcional)", key=f"pafi_man_{rk}")
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
@@ -508,6 +679,143 @@ with tab_estudios:
         tc = st.text_area("Tomografía (TC)", height=68, key=f"tc_{rk}")
         eco = st.text_area("Ecografía / POCUS", height=68, key=f"eco_{rk}")
 
+
+# --- PIEL / UPP / DECÚBITO ---
+with tab_piel:
+    # Variables vacías mantenidas por compatibilidad con el generador final.
+    piel_estado = ""
+    decubito_actual = ""
+    cambios_posturales = ""
+    superficie_apoyo = ""
+    upp_medidas_prevencion = []
+    upp_conducta_general = ""
+    braden_resultado = {}
+
+    st.info("💡 Módulo de lesiones por presión con mapa anatómico basado en la imagen adjunta. Se retiraron las secciones de Braden, estado general de piel y decúbito.")
+
+    with st.container(border=True):
+        st.subheader("🗺️ Mapa de puntos de presión para úlceras por decúbito")
+        st.caption("Seleccione la vista corporal y haga clic sobre el punto rojo correspondiente a la localización.")
+
+        mapa_resumen = resumen_mapa_corporal()
+        mp1, mp2 = st.columns(2)
+        with mp1:
+            st.markdown("**Vista anterior**")
+            st.caption(mapa_resumen.get("Anterior", ""))
+        with mp2:
+            st.markdown("**Vista posterior**")
+            st.caption(mapa_resumen.get("Posterior", ""))
+
+        cantidad_lesiones_upp = st.number_input(
+            "Cantidad de lesiones a registrar",
+            min_value=0,
+            max_value=8,
+            value=0,
+            step=1,
+            key=f"cantidad_lesiones_upp_{rk}",
+        )
+
+        upp_lesiones = []
+        for idx in range(int(cantidad_lesiones_upp)):
+            with st.expander(f"Lesión {idx + 1}", expanded=True):
+                l1, l2 = st.columns(2)
+                vista = l1.selectbox("Vista corporal", VISTAS_CORPORALES, key=f"upp_vista_{idx}_{rk}")
+                lateralidad = l2.selectbox("Lado", LATERALIDADES_UPP, key=f"upp_lado_{idx}_{rk}")
+
+                mapa_state_key = f"upp_mapa_sel_{idx}_{rk}"
+                mapa_nonce_key = f"{mapa_state_key}_nonce"
+                if mapa_nonce_key not in st.session_state:
+                    st.session_state[mapa_nonce_key] = 0
+
+                localizacion = st.session_state.get(mapa_state_key, "")
+
+                # Si cambia la vista, se evita arrastrar una selección incompatible.
+                if localizacion and localizacion not in referencias_mapa_corporal(vista):
+                    st.session_state[mapa_state_key] = ""
+                    localizacion = ""
+
+                imagen_mapa = crear_imagen_mapa_corporal(vista, selected_zone=localizacion)
+
+                if streamlit_image_coordinates is not None:
+                    click_mapa = streamlit_image_coordinates(
+                        imagen_mapa,
+                        key=f"upp_mapa_coords_{idx}_{rk}_{vista}_{st.session_state[mapa_nonce_key]}",
+                        width=imagen_mapa.width,
+                    )
+                    if click_mapa and isinstance(click_mapa, dict):
+                        zona_click = zona_desde_coordenadas(vista, click_mapa.get("x"), click_mapa.get("y"))
+                        if zona_click and zona_click != localizacion:
+                            st.session_state[mapa_state_key] = zona_click
+                            st.rerun()
+                else:
+                    st.error("Falta instalar `streamlit-image-coordinates`. Revise requirements.txt y reinicie Streamlit.")
+                    zona_fallback = st.selectbox(
+                        "Zona anatómica del mapa",
+                        [""] + referencias_mapa_corporal(vista),
+                        key=f"upp_mapa_fallback_{idx}_{rk}",
+                    )
+                    if zona_fallback and zona_fallback != localizacion:
+                        st.session_state[mapa_state_key] = zona_fallback
+                        st.rerun()
+
+                info1, info2 = st.columns([5, 1])
+                with info1:
+                    localizacion = st.session_state.get(mapa_state_key, "")
+                    if localizacion:
+                        st.success(f"Zona anatómica seleccionada: {localizacion}")
+                    else:
+                        st.warning("Seleccione la localización haciendo clic sobre el punto rojo correspondiente en la imagen.")
+                with info2:
+                    if st.button("Limpiar zona", key=f"upp_clear_zone_{idx}_{rk}"):
+                        st.session_state[mapa_state_key] = ""
+                        st.session_state[mapa_nonce_key] += 1
+                        st.rerun()
+
+                with st.expander("Ver referencias anatómicas del mapa", expanded=False):
+                    for zona_ref in referencias_mapa_corporal(vista):
+                        st.markdown(f"- {zona_ref}")
+
+                estadio = st.selectbox("Grado / estadio / tipo", ESTADIOS_UPP, key=f"upp_estadio_{idx}_{rk}")
+                detalle_topografico = st.text_input(
+                    "Detalle anatómico adicional (opcional)",
+                    placeholder="Ej: paramediana sacra derecha, región trocantérica posterior, borde externo del talón...",
+                    key=f"upp_detalle_topografico_{idx}_{rk}",
+                )
+
+                m1, m2, m3 = st.columns(3)
+                largo_cm = m1.text_input("Largo (cm)", key=f"upp_largo_{idx}_{rk}")
+                ancho_cm = m2.text_input("Ancho (cm)", key=f"upp_ancho_{idx}_{rk}")
+                profundidad_cm = m3.text_input("Profundidad (cm)", key=f"upp_prof_{idx}_{rk}")
+
+                c1, c2, c3 = st.columns(3)
+                lecho = c1.selectbox("Lecho", LECHOS_UPP, key=f"upp_lecho_{idx}_{rk}")
+                exudado = c2.selectbox("Exudado", EXUDADOS_UPP, key=f"upp_exudado_{idx}_{rk}")
+                perilesional = c3.selectbox("Piel perilesional", PERILESIONAL_UPP, key=f"upp_perilesional_{idx}_{rk}")
+
+                c4, c5 = st.columns(2)
+                infeccion = c4.selectbox("Signos de infección", INFECCION_UPP, key=f"upp_infeccion_{idx}_{rk}")
+                dolor = c5.selectbox("Dolor", DOLOR_UPP, key=f"upp_dolor_{idx}_{rk}")
+
+                observaciones = st.text_area("Observaciones", height=68, key=f"upp_obs_{idx}_{rk}")
+                conducta = st.text_area("Conducta local", height=68, key=f"upp_conducta_{idx}_{rk}")
+
+                upp_lesiones.append({
+                    "vista": vista,
+                    "localizacion": st.session_state.get(mapa_state_key, ""),
+                    "lateralidad": lateralidad,
+                    "detalle_topografico": detalle_topografico,
+                    "estadio": estadio,
+                    "largo_cm": largo_cm,
+                    "ancho_cm": ancho_cm,
+                    "profundidad_cm": profundidad_cm,
+                    "lecho": lecho,
+                    "exudado": exudado,
+                    "perilesional": perilesional,
+                    "infeccion": infeccion,
+                    "dolor": dolor,
+                    "observaciones": observaciones,
+                    "conducta": conducta,
+                })
 
 # --- RUTINA CENTRAL DE AUTO-CÁLCULO V2.0 ---
 flags_scores = {
