@@ -475,12 +475,75 @@ with tab_clinica:
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
-        n1, n2, n3, n4, n5 = st.columns(5)
+        n1, n2, n3 = st.columns(3)
         neuro_estado = n1.text_input("Estado", d_str("Alerta"), key=f"neuro_{rk}")
-        glasgow = n2.text_input("Glasgow", d_str("15/15"), key=f"glasgow_{rk}")
-        rass = n3.text_input("RASS", d_str("0"), key=f"rass_{rk}")
-        cam = n4.text_input("CAM-ICU", d_str("-"), key=f"cam_{rk}")
-        pupilas = n5.text_input("Pupilas", d_str("Isocóricas y reactivas"), key=f"pupilas_{rk}")
+        cam = n2.text_input("CAM-ICU", d_str("-"), key=f"cam_{rk}")
+        pupilas = n3.text_input("Pupilas", d_str("Isocóricas y reactivas"), key=f"pupilas_{rk}")
+
+        with st.expander("🧠 Escala de Glasgow", expanded=False):
+            st.caption("Seleccione los componentes. El total se calcula automáticamente.")
+            g1, g2, g3 = st.columns(3)
+
+            glasgow_ocular_opciones = [
+                "4 - Espontánea",
+                "3 - Al llamado",
+                "2 - Al dolor",
+                "1 - Ninguna",
+            ]
+            glasgow_verbal_opciones = [
+                "5 - Orientado",
+                "4 - Confuso",
+                "3 - Palabras inapropiadas",
+                "2 - Sonidos incomprensibles",
+                "1 - Ninguna",
+                "T - No evaluable por TOT/TQT",
+            ]
+            glasgow_motor_opciones = [
+                "6 - Obedece órdenes",
+                "5 - Localiza dolor",
+                "4 - Retira al dolor",
+                "3 - Flexión anormal",
+                "2 - Extensión anormal",
+                "1 - Ninguna",
+            ]
+
+            gcs_o_txt = g1.selectbox("Apertura ocular", glasgow_ocular_opciones, key=f"gcs_o_{rk}")
+            gcs_v_txt = g2.selectbox("Respuesta verbal", glasgow_verbal_opciones, key=f"gcs_v_{rk}")
+            gcs_m_txt = g3.selectbox("Respuesta motora", glasgow_motor_opciones, key=f"gcs_m_{rk}", index=0)
+
+            gcs_o = int(gcs_o_txt.split(" - ")[0])
+            gcs_m = int(gcs_m_txt.split(" - ")[0])
+            gcs_v_intubado = gcs_v_txt.startswith("T")
+            gcs_v = 1 if gcs_v_intubado else int(gcs_v_txt.split(" - ")[0])
+            gcs_total = gcs_o + gcs_v + gcs_m
+
+            if gcs_v_intubado:
+                glasgow = f"{gcs_total}T/15 (O{gcs_o} Vt M{gcs_m})"
+            else:
+                glasgow = f"{gcs_total}/15 (O{gcs_o} V{gcs_v} M{gcs_m})"
+
+            st.success(f"Glasgow calculado: {glasgow}")
+            st.caption(
+                "Referencia rápida: Ocular 4-1 | Verbal 5-1 o Vt si no evaluable por vía aérea artificial | Motora 6-1."
+            )
+
+        with st.expander("🎯 Escala RASS", expanded=False):
+            st.caption("Seleccione el nivel de sedación/agitación. El valor se carga automáticamente en la evolución.")
+            rass_opciones = [
+                "+4 - Combativo",
+                "+3 - Muy agitado",
+                "+2 - Agitado",
+                "+1 - Inquieto",
+                "0 - Alerta y calmado",
+                "-1 - Somnoliento",
+                "-2 - Sedación ligera",
+                "-3 - Sedación moderada",
+                "-4 - Sedación profunda",
+                "-5 - No despierta",
+            ]
+            rass_txt = st.selectbox("RASS", rass_opciones, index=4, key=f"rass_calc_{rk}")
+            rass = rass_txt.split(" - ")[0]
+            st.info(f"RASS seleccionado: {rass_txt}")
 
         h1, h2, h3, h4, h5 = st.columns(5)
         ta = h1.text_input("TA", placeholder="120/80", key=f"ta_{rk}")

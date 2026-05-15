@@ -42,6 +42,25 @@ def eliminar_bloque_alertas_seguridad(texto: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", texto).strip() + "\n"
 
 
+def eliminar_bloque_infusiones_dispositivos_vacio(texto: str) -> str:
+    """
+    Elimina de la evolución final el bloque INFUSIONES Y DISPOSITIVOS cuando
+    solo contiene textos vacíos/heredados:
+    - Sin infusiones activas.
+    - Invasiones: CVC: | Cat.Art: | SV: | SNG:
+    """
+    if not texto:
+        return texto
+
+    patron = (
+        r"\n?>>\s*INFUSIONES Y DISPOSITIVOS:\s*\n"
+        r"(?:Infusiones Activas:\s*(?:Sin infusiones activas\.)?\s*\n)?"
+        r"(?:Invasiones:\s*CVC:\s*\|\s*Cat\.Art:\s*\|\s*SV:\s*\|\s*SNG:\s*\n?)?"
+    )
+    texto = re.sub(patron, "\n", texto, flags=re.IGNORECASE)
+    return re.sub(r"\n{3,}", "\n\n", texto)
+
+
 def limpiar_valor_score_para_evolucion(valor: Any) -> str:
     """Quita origen manual/automático e interpretación del valor de score para HC."""
     texto = s(valor).strip()
