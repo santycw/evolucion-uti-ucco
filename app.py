@@ -105,6 +105,8 @@ st.markdown("""
 st.title("🏥 Asistente de Evolución UTI / UCCO")
 st.caption("Estructura Completa Garantizada | Lab y ECG Extendidos | Auto-Scores | Guías ESC 2024")
 
+hoy = datetime.date.today()
+
 # --- PANEL LATERAL ---
 with st.sidebar:
     st.header("📌 Contexto del Paciente")
@@ -114,13 +116,27 @@ with st.sidebar:
         peso_paciente = st.number_input("Peso Estimado (kg)", min_value=1.0, value=70.0, step=1.0, key=f"peso_{rk}")
         fecha_hosp = st.date_input("Fecha de Ingreso Institución", format="DD/MM/YYYY", key=f"fhosp_{rk}")
         fecha_uti = st.date_input("Fecha de ingreso UTI/UCCO", format="DD/MM/YYYY", key=f"futi_{rk}")
-        dias_arm = st.text_input("Días ARM", placeholder="Ej: 0 o dejar vacío", key=f"darm_{rk}")
+
+        paciente_en_arm = st.checkbox("Paciente con ARM / intubado", key=f"paciente_arm_{rk}")
+        fecha_intubacion = None
+        if paciente_en_arm:
+            fecha_intubacion = st.date_input(
+                "Fecha de intubación",
+                value=hoy,
+                max_value=hoy,
+                format="DD/MM/YYYY",
+                key=f"fecha_intubacion_{rk}",
+            )
+            dias_arm_calc = max((hoy - fecha_intubacion).days + 1, 1)
+            dias_arm = str(dias_arm_calc)
+            st.caption(f"Días ARM calculados automáticamente: Día {dias_arm_calc}")
+        else:
+            dias_arm = "0"
 
     st.header("📋 Diagnóstico de Ingreso")
     with st.container(border=True):
         diagnostico = st.text_area("Diagnósticos (Escriba 'FA' para activar score):", d_str("1. \n2. "), height=120, key=f"diag_{rk}")
 
-hoy = datetime.date.today()
 dias_int_hosp = (hoy - fecha_hosp).days
 dias_int_uti = (hoy - fecha_uti).days
 
@@ -459,11 +475,12 @@ with tab_clinica:
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
-        n1, n2, n3, n4 = st.columns(4)
+        n1, n2, n3, n4, n5 = st.columns(5)
         neuro_estado = n1.text_input("Estado", d_str("Alerta"), key=f"neuro_{rk}")
         glasgow = n2.text_input("Glasgow", d_str("15/15"), key=f"glasgow_{rk}")
         rass = n3.text_input("RASS", d_str("0"), key=f"rass_{rk}")
         cam = n4.text_input("CAM-ICU", d_str("-"), key=f"cam_{rk}")
+        pupilas = n5.text_input("Pupilas", d_str("Isocóricas y reactivas"), key=f"pupilas_{rk}")
 
         h1, h2, h3, h4, h5 = st.columns(5)
         ta = h1.text_input("TA", placeholder="120/80", key=f"ta_{rk}")

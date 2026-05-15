@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any, Iterable, List, Tuple
 import re
 
-from .scores import formatear_scores_detectados
 from .validaciones import p_num
 from .upp import formatear_bloque_upp
 
@@ -43,14 +42,77 @@ def eliminar_bloque_alertas_seguridad(texto: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", texto).strip() + "\n"
 
 
+def limpiar_valor_score_para_evolucion(valor: Any) -> str:
+    """Quita origen manual/automático e interpretación del valor de score para HC."""
+    texto = s(valor).strip()
+    texto = re.sub(r"\s*\[(?:Auto|Manual|Automático|Automatico)\]\s*", "", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"\s*\((?:Auto|Manual|Automático|Automatico)\)\s*", "", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"\s*-\s*Interpretaci[oó]n.*$", "", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
+
+
+def formatear_scores_para_evolucion(scores_globales: List[dict]) -> List[str]:
+    """
+    Formatea scores para evolución final sin origen Auto/Manual y sin interpretación orientativa.
+    La visualización de origen/interpretación queda reservada para la app, no para HC.
+    """
+    lineas: List[str] = []
+
+    for grupo in scores_globales or []:
+        categoria = s(grupo.get("categoria", "Scores")).strip() or "Scores"
+        partes = []
+
+        if "items" in grupo:
+            for item in grupo.get("items", []):
+                nombre = s(item.get("nombre", "")).strip()
+                valor = limpiar_valor_score_para_evolucion(item.get("valor", ""))
+                if nombre and valor and valor.lower() not in ["no calculable", "no calculado", ""]:
+                    partes.append(f"{nombre}: {valor}")
+        else:
+            for nombre, valor in (grupo.get("scores", {}) or {}).items():
+                valor_limpio = limpiar_valor_score_para_evolucion(valor)
+                if s(nombre).strip() and valor_limpio and valor_limpio.lower() not in ["no calculable", "no calculado"]:
+                    partes.append(f"{nombre}: {valor_limpio}")
+
+        if partes:
+            lineas.append(f"- {categoria}: " + " | ".join(partes))
+
+    return lineas
+
+
+def construir_bloque_infusiones_dispositivos(datos: dict) -> str:
+    """Imprime infusiones/invasiones solo si existen datos cargados."""
+    partes = []
+
+    infusiones = datos.get("infusiones_automatizadas", []) or []
+    infusiones = [s(x).strip() for x in infusiones if s(x).strip()]
+    if infusiones:
+        partes.append("Infusiones Activas: " + " | ".join(infusiones))
+
+    invasiones = []
+    for etiqueta, clave in [
+        ("CVC", "cvc_info"),
+        ("Cat.Art", "ca_info"),
+        ("SV", "sv_dias"),
+        ("SNG", "sng_dias"),
+    ]:
+        valor = s(datos.get(clave, "")).strip()
+        if valor:
+            invasiones.append(f"{etiqueta}: {valor}")
+
+    if invasiones:
+        partes.append("Invasiones: " + " | ".join(invasiones))
+
+    if not partes:
+        return ""
+
+    return "\n>> INFUSIONES Y DISPOSITIVOS:\n" + "\n".join(partes) + "\n"
+
+
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:
     """Genera el texto completo de evolución UTI/UCCO."""
-    infusiones_automatizadas = datos.get("infusiones_automatizadas", []) or []
-
-    if infusiones_automatizadas:
-        str_automatizadas = " | ".join(infusiones_automatizadas)
-    else:
-        str_automatizadas = "Sin infusiones activas."
+    bloque_infusiones_dispositivos = construir_bloque_infusiones_dispositivos(datos)
 
     l_eab = construir_linea_lab([
         ("pH", datos.get("ph", ""), ""),
@@ -268,11 +330,18 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
 
     bloque_scores_impresion = ""
     if scores_para_imprimir:
-        lineas_impresion = formatear_scores_detectados(scores_para_imprimir)
-        bloque_scores_impresion = "\n".join(lineas_impresion) + "\n"
+        lineas_impresion = formatear_scores_para_evolucion(scores_para_imprimir)
+        bloque_scores_impresion = "\n".join(lineas_impresion) + "\n" if lineas_impresion else ""
 
     problemas_activos_manual = s(datos.get("problemas_activos_manual", ""))
     bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
+
+    pupilas_txt = s(datos.get("pupilas", "")).strip()
+    pupilas_txt = f", Pupilas {pupilas_txt}" if pupilas_txt else ""
+    neuro_linea = (
+        f"- NEURO: {datos.get('neuro_estado')}, Glasgow {datos.get('glasgow')}, "
+        f"RASS {datos.get('rass')}, CAM {datos.get('cam')}{pupilas_txt}."
+    )
 
     texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {datos.get('dias_int_hosp')} | Días UTI: {datos.get('dias_int_uti')} | Días ARM: {datos.get('dias_arm')}
@@ -283,20 +352,16 @@ DIAGNÓSTICO:
 (S) SUBJETIVO: {datos.get('subj')}
 
 (O) OBJETIVO:
->> INFUSIONES Y DISPOSITIVOS:
-Infusiones Activas: {str_automatizadas}
-Invasiones: CVC: {datos.get('cvc_info')} | Cat.Art: {datos.get('ca_info')} | SV: {datos.get('sv_dias')} | SNG: {datos.get('sng_dias')}
-
+{bloque_infusiones_dispositivos}
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
 {signos_vitales}
 
-- NEURO: {datos.get('neuro_estado')}, Glasgow {datos.get('glasgow')}, RASS {datos.get('rass')}, CAM {datos.get('cam')}.
+{neuro_linea}
 - CV: {datos.get('ex_cv')}
 - RESP: {texto_resp}
 - ABD/RENAL: {datos.get('ex_abd')} | Ex. Renal: {datos.get('ex_renal')}{nutri_txt}{balance_txt}
 
 {bloque_piel_upp}>> LABORATORIO Y MEDIO INTERNO:
->> LABORATORIO Y MEDIO INTERNO:
 {texto_laboratorio}
 {bloque_estudios}
 >> FAST HUG BID:
