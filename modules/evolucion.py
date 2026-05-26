@@ -101,32 +101,32 @@ def formatear_scores_para_evolucion(scores_globales: List[dict]) -> List[str]:
 
 
 def construir_bloque_infusiones_dispositivos(datos: dict) -> str:
-    """Imprime infusiones/invasiones solo si existen datos cargados."""
-    partes = []
+    """Imprime infusiones e invasiones en formato listado, omitiendo secciones vacías."""
+    lineas = []
 
     infusiones = datos.get("infusiones_automatizadas", []) or []
     infusiones = [s(x).strip() for x in infusiones if s(x).strip()]
     if infusiones:
-        partes.append("Infusiones Activas: " + " | ".join(infusiones))
+        lineas.append("Infusiones activas:")
+        for infusion in infusiones:
+            lineas.append(f"- {infusion}")
 
-    invasiones = []
-    for etiqueta, clave in [
+    dispositivos = [
         ("CVC", "cvc_info"),
-        ("Cat.Art", "ca_info"),
+        ("Cat Art", "ca_info"),
         ("SV", "sv_dias"),
-        ("SNG", "sng_dias"),
-    ]:
+        ("SNG/SOG/SNY/Botón gástrico", "sng_dias"),
+    ]
+
+    for etiqueta, clave in dispositivos:
         valor = s(datos.get(clave, "")).strip()
         if valor:
-            invasiones.append(f"{etiqueta}: {valor}")
+            lineas.append(f"{etiqueta}: {valor}")
 
-    if invasiones:
-        partes.append("Invasiones: " + " | ".join(invasiones))
-
-    if not partes:
+    if not lineas:
         return ""
 
-    return "\n>> INFUSIONES Y DISPOSITIVOS:\n" + "\n".join(partes) + "\n"
+    return "\n>> INFUSIONES Y DISPOSITIVOS:\n" + "\n".join(lineas) + "\n"
 
 
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:

@@ -400,78 +400,188 @@ with tab_clinica:
                     st.session_state['infusiones_automatizadas'] = []
                     rerun_app()
 
-        st.caption("Invasiones / Accesos")
-        d1, d2, d3, d4, d5, d6 = st.columns([1.25, 1.35, 1.0, 1.0, 1.0, 1.0])
+        st.markdown("#### 🧷 Invasiones / Accesos")
+        st.caption("Carga estructurada. Los días se calculan automáticamente desde la fecha de colocación.")
 
-        cvc_tipo = d1.selectbox(
-            "Tipo de CVC",
-            [
-                "",
-                "CVC convencional",
-                "CVC bilumen",
-                "CVC trilumen",
-                "PICC",
-                "Introductor venoso central",
-                "Catéter de hemodiálisis / Shaldon",
-                "Port-a-cath",
-                "Swan-Ganz",
-                "Otro CVC",
-            ],
-            key=f"cvc_tipo_{rk}",
-            help="Seleccione únicamente si el paciente tiene CVC colocado.",
-        )
-
-        cvc_ubicacion = ""
-        cvc_fecha = None
-        cvc_dias_auto = ""
         cvc_info = ""
+        ca_info = ""
+        sv_dias = ""
+        sng_dias = ""
 
-        if cvc_tipo:
-            cvc_ubicacion = d2.selectbox(
-                "Ubicación CVC",
+        with st.container(border=True):
+            st.markdown("##### CVC")
+            c1, c2, c3 = st.columns([1.25, 1.45, 1.0])
+
+            cvc_tipo = c1.selectbox(
+                "Tipo de CVC",
                 [
                     "",
-                    "Yugular interna derecha",
-                    "Yugular interna izquierda",
-                    "Subclavia derecha",
-                    "Subclavia izquierda",
-                    "Femoral derecha",
-                    "Femoral izquierda",
-                    "PICC basílica derecha",
-                    "PICC basílica izquierda",
-                    "PICC cefálica derecha",
-                    "PICC cefálica izquierda",
-                    "PICC braquial derecha",
-                    "PICC braquial izquierda",
-                    "Port-a-cath subclavio derecho",
-                    "Port-a-cath subclavio izquierdo",
-                    "Otra ubicación",
+                    "CVC convencional",
+                    "CVC bilumen",
+                    "CVC trilumen",
+                    "PICC",
+                    "Introductor venoso central",
+                    "Catéter de hemodiálisis / Shaldon",
+                    "Port-a-cath",
+                    "Swan-Ganz",
+                    "Otro CVC",
                 ],
-                key=f"cvc_ubicacion_{rk}",
-                help="Seleccione el sitio anatómico del CVC.",
+                key=f"cvc_tipo_{rk}",
+                help="Seleccione únicamente si el paciente tiene CVC colocado.",
             )
 
-            cvc_fecha = d3.date_input(
-                "Fecha CVC",
-                value=hoy,
-                max_value=hoy,
-                format="DD/MM/YYYY",
-                key=f"cvc_fecha_{rk}",
-            )
-            cvc_dias_n = max((hoy - cvc_fecha).days + 1, 1)
-            cvc_dias_auto = f"Día {cvc_dias_n}"
-            d3.caption(f"{cvc_dias_auto} de CVC")
+            if cvc_tipo:
+                cvc_ubicacion = c2.selectbox(
+                    "Localización CVC",
+                    [
+                        "",
+                        "Yugular interna derecha",
+                        "Yugular interna izquierda",
+                        "Subclavia derecha",
+                        "Subclavia izquierda",
+                        "Femoral derecha",
+                        "Femoral izquierda",
+                        "PICC basílica derecha",
+                        "PICC basílica izquierda",
+                        "PICC cefálica derecha",
+                        "PICC cefálica izquierda",
+                        "PICC braquial derecha",
+                        "PICC braquial izquierda",
+                        "Port-a-cath subclavio derecho",
+                        "Port-a-cath subclavio izquierdo",
+                        "Otra localización",
+                    ],
+                    key=f"cvc_ubicacion_{rk}",
+                )
+                cvc_fecha = c3.date_input(
+                    "Fecha CVC",
+                    value=hoy,
+                    max_value=hoy,
+                    format="DD/MM/YYYY",
+                    key=f"cvc_fecha_{rk}",
+                )
+                cvc_dias_n = max((hoy - cvc_fecha).days + 1, 1)
+                cvc_dias_auto = f"Día {cvc_dias_n}"
+                c3.caption(cvc_dias_auto)
 
-            if cvc_ubicacion:
-                cvc_info = f"{cvc_tipo} {cvc_ubicacion}, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
+                if cvc_ubicacion:
+                    cvc_info = f"{cvc_tipo} {cvc_ubicacion}, {cvc_dias_auto}"
+                else:
+                    cvc_info = f"{cvc_tipo} localización no consignada, {cvc_dias_auto}"
             else:
-                cvc_info = f"{cvc_tipo}, ubicación no consignada, colocado el {cvc_fecha.strftime('%d/%m/%Y')}, {cvc_dias_auto}"
-        else:
-            d2.caption("Sin CVC consignado")
+                c2.caption("Sin CVC consignado")
 
-        ca_info = d4.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
-        sv_dias = d5.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d6.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+        with st.container(border=True):
+            st.markdown("##### Catéter arterial")
+            a1, a2, a3 = st.columns([1.25, 1.45, 1.0])
+
+            cat_art_tipo = a1.selectbox(
+                "Tipo Cat Art",
+                [
+                    "",
+                    "Catéter arterial",
+                    "Línea arterial",
+                    "Introductor arterial",
+                    "Otro catéter arterial",
+                ],
+                key=f"cat_art_tipo_{rk}",
+            )
+
+            if cat_art_tipo:
+                cat_art_ubicacion = a2.selectbox(
+                    "Localización Cat Art",
+                    [
+                        "",
+                        "Radial derecha",
+                        "Radial izquierda",
+                        "Femoral derecha",
+                        "Femoral izquierda",
+                        "Braquial derecha",
+                        "Braquial izquierda",
+                        "Axilar derecha",
+                        "Axilar izquierda",
+                        "Otra localización",
+                    ],
+                    key=f"cat_art_ubicacion_{rk}",
+                )
+                cat_art_fecha = a3.date_input(
+                    "Fecha Cat Art",
+                    value=hoy,
+                    max_value=hoy,
+                    format="DD/MM/YYYY",
+                    key=f"cat_art_fecha_{rk}",
+                )
+                cat_art_dias_n = max((hoy - cat_art_fecha).days + 1, 1)
+                cat_art_dias_auto = f"Día {cat_art_dias_n}"
+                a3.caption(cat_art_dias_auto)
+
+                if cat_art_ubicacion:
+                    ca_info = f"{cat_art_tipo} {cat_art_ubicacion}, {cat_art_dias_auto}"
+                else:
+                    ca_info = f"{cat_art_tipo} localización no consignada, {cat_art_dias_auto}"
+            else:
+                a2.caption("Sin catéter arterial consignado")
+
+        with st.container(border=True):
+            st.markdown("##### Sonda vesical")
+            sv1, sv2, sv3 = st.columns([1.25, 1.0, 1.0])
+
+            sv_material = sv1.selectbox(
+                "Material SV",
+                ["", "Siliconada", "Látex"],
+                key=f"sv_material_{rk}",
+            )
+
+            if sv_material:
+                sv_vias = sv2.selectbox(
+                    "Vías SV",
+                    ["2 vías", "3 vías"],
+                    key=f"sv_vias_{rk}",
+                )
+                sv_fecha = sv3.date_input(
+                    "Fecha SV",
+                    value=hoy,
+                    max_value=hoy,
+                    format="DD/MM/YYYY",
+                    key=f"sv_fecha_{rk}",
+                )
+                sv_dias_n = max((hoy - sv_fecha).days + 1, 1)
+                sv_dias_auto = f"Día {sv_dias_n}"
+                sv3.caption(sv_dias_auto)
+                sv_dias = f"Sonda vesical {sv_material.lower()}, {sv_vias}, {sv_dias_auto}"
+            else:
+                sv2.caption("Sin sonda vesical consignada")
+
+        with st.container(border=True):
+            st.markdown("##### Sonda digestiva / acceso enteral")
+            dg1, dg2 = st.columns([1.45, 1.0])
+
+            sonda_digestiva_tipo = dg1.selectbox(
+                "Tipo",
+                [
+                    "",
+                    "SNG",
+                    "Sonda orogástrica",
+                    "Sonda nasoyeyunal",
+                    "Botón gástrico",
+                ],
+                key=f"sonda_digestiva_tipo_{rk}",
+            )
+
+            if sonda_digestiva_tipo:
+                sonda_digestiva_fecha = dg2.date_input(
+                    "Fecha",
+                    value=hoy,
+                    max_value=hoy,
+                    format="DD/MM/YYYY",
+                    key=f"sonda_digestiva_fecha_{rk}",
+                )
+                sonda_digestiva_dias_n = max((hoy - sonda_digestiva_fecha).days + 1, 1)
+                sonda_digestiva_dias_auto = f"Día {sonda_digestiva_dias_n}"
+                dg2.caption(sonda_digestiva_dias_auto)
+                sng_dias = f"{sonda_digestiva_tipo}, {sonda_digestiva_dias_auto}"
+            else:
+                dg2.caption("Sin sonda digestiva/acceso enteral consignado")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
