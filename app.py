@@ -1344,6 +1344,13 @@ with tab_planes:
         scores_para_imprimir = motor_scores(flags_scores, manuales_scores, auto_scores)
         datos_evolucion = dict(locals())
         datos_evolucion["infusiones_automatizadas"] = st.session_state.get("infusiones_automatizadas", [])
+
+        # FAST HUG BID se envía siempre limpio, sin símbolos heredados.
+        datos_evolucion["fast_sel"] = [
+            re.sub(r"^[\s\-\*\u2713\u2714\u221A√✓✔☑]+", "", str(item).replace("–", "-").replace("—", "-")).strip()
+            for item in fast_sel
+            if str(item).strip()
+        ]
         # Las alertas de seguridad se muestran solo en la ventana general de la app.
         # No se incorporan al texto final de evolución.
 
