@@ -100,33 +100,78 @@ def formatear_scores_para_evolucion(scores_globales: List[dict]) -> List[str]:
     return lineas
 
 
+def formatear_infusion_para_evolucion(infusion: Any) -> str:
+    """
+    Simplifica una infusión automatizada para la evolución final.
+
+    Entrada habitual:
+    Noradrenalina: 4 mg/UI en 100 ml (...); Bomba 4 ml/h; Dosis 0.0571 mcg/kg/min
+
+    Salida:
+    Noradrenalina: 0.0571 mcg/kg/min
+    """
+    texto = s(infusion).strip()
+    if not texto:
+        return ""
+
+    nombre = texto.split(":", 1)[0].strip() if ":" in texto else ""
+
+    match_dosis = re.search(r"Dosis\s+([0-9]+(?:[.,][0-9]+)?)\s+([^;]+)$", texto, flags=re.IGNORECASE)
+    if match_dosis and nombre:
+        valor = match_dosis.group(1).replace(",", ".")
+        unidad = match_dosis.group(2).strip()
+        return f"{nombre}: {valor} {unidad}"
+
+    return texto
+
+
 def construir_bloque_infusiones_dispositivos(datos: dict) -> str:
-    """Imprime infusiones e invasiones en formato listado, omitiendo secciones vacías."""
-    lineas = []
+    """
+    Imprime infusiones y dispositivos en bloques separados.
+
+    Formato:
+    >> INFUSIONES:
+    Infusiones activas:
+    - Noradrenalina: 0.0571 mcg/kg/min
+
+    >> DISPOSITIVOS:
+    CVC: ...
+    Cat Art: ...
+    SV: ...
+    SNG/SOG/SNY/Botón gástrico: ...
+    """
+    bloques = []
 
     infusiones = datos.get("infusiones_automatizadas", []) or []
-    infusiones = [s(x).strip() for x in infusiones if s(x).strip()]
-    if infusiones:
-        lineas.append("Infusiones activas:")
-        for infusion in infusiones:
-            lineas.append(f"- {infusion}")
+    infusiones = [formatear_infusion_para_evolucion(x) for x in infusiones]
+    infusiones = [x for x in infusiones if x]
 
-    dispositivos = [
+    if infusiones:
+        lineas_infusiones = [">> INFUSIONES:", "Infusiones activas:"]
+        lineas_infusiones.extend([f"- {infusion}" for infusion in infusiones])
+        bloques.append("\n".join(lineas_infusiones))
+
+    dispositivos = []
+    for etiqueta, clave in [
         ("CVC", "cvc_info"),
         ("Cat Art", "ca_info"),
         ("SV", "sv_dias"),
         ("SNG/SOG/SNY/Botón gástrico", "sng_dias"),
-    ]
-
-    for etiqueta, clave in dispositivos:
+    ]:
         valor = s(datos.get(clave, "")).strip()
         if valor:
-            lineas.append(f"{etiqueta}: {valor}")
+            dispositivos.append(f"{etiqueta}: {valor}")
 
-    if not lineas:
+    if dispositivos:
+        lineas_dispositivos = [">> DISPOSITIVOS:"]
+        lineas_dispositivos.extend(dispositivos)
+        bloques.append("\n".join(lineas_dispositivos))
+
+    if not bloques:
         return ""
 
-    return "\n>> INFUSIONES Y DISPOSITIVOS:\n" + "\n".join(lineas) + "\n"
+    return "\n" + "\n".join(bloques) + "\n"
+
 
 
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:
