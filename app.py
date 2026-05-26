@@ -724,7 +724,11 @@ with tab_clinica:
         if fio2_auto is not None:
             r_b2.caption(f"FiO₂ automática por {via_aerea}: {fio2_auto}%")
 
-        pafi_manual = r_b3.text_input("PaFiO2 (Opcional)", key=f"pafi_man_{rk}")
+        pafi_manual = r_b3.text_input(
+            "PaFiO2 manual (solo gases arteriales)",
+            key=f"pafi_man_{rk}",
+            help="Solo se utiliza si en Laboratorio se selecciona Tipo de gases = Gases arteriales.",
+        )
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
         if paciente_ventilado:
@@ -795,6 +799,11 @@ with tab_lab:
         hco3 = e5.text_input("HCO3 (mEq/L)", key=f"hco3_{rk}")
         eb = e6.text_input("EB (mEq/L)", key=f"eb_{rk}")
         lactato = e7.text_input("Lac (mmol/L)", key=f"lac_{rk}")
+
+        if tipo_gases == "Gases venosos":
+            st.caption("PaFiO2 / IROX no se calcularán porque la muestra seleccionada es venosa.")
+        elif not tipo_gases:
+            st.caption("Seleccione tipo de gases para habilitar cálculo válido de PaFiO2 / IROX.")
 
     with st.container(border=True):
         st.subheader("🩸 Hemograma y Coagulación")
@@ -1073,12 +1082,22 @@ manuales_scores = {
     "psi": psi,
 }
 
+es_gas_arterial = tipo_gases == "Gases arteriales"
+pafi_manual_score = pafi_manual if es_gas_arterial else ""
+po2_score = po2 if es_gas_arterial else ""
+sato2_eab_score = sato2_eab if es_gas_arterial else ""
+sat_score = sat if es_gas_arterial else ""
+
 datos_score = {
     "ta": ta,
     "glasgow": glasgow,
     "fio2": fio2,
-    "pafi_manual": pafi_manual,
-    "po2": po2,
+    "pafi_manual": pafi_manual_score,
+    "po2": po2_score,
+    "tipo_gases": tipo_gases,
+    "es_gas_arterial": es_gas_arterial,
+    "sato2_eab": sato2_eab_score,
+    "sat": sat_score,
     "plaq": plaq,
     "bt": bt,
     "cr": cr,

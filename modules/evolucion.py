@@ -174,6 +174,48 @@ def construir_bloque_infusiones_dispositivos(datos: dict) -> str:
 
 
 
+
+
+def limpiar_item_fast_hug(item: Any) -> str:
+    """
+    Limpia símbolos incompatibles/heredados del FAST HUG BID.
+
+    Corrige casos guardados o generados previamente como:
+    - "✓ F – Feeding"
+    - "√ F – Feeding"
+    - "✔ F - Feeding"
+    - "- F - Feeding"
+
+    Devuelve siempre: "F - Feeding".
+    """
+    texto = s(item).strip()
+    texto = texto.replace("–", "-").replace("—", "-")
+    texto = re.sub(r"^[\s\-\•\*\u2713\u2714\u221A√✓✔☑]+", "", texto).strip()
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
+
+
+
+def normalizar_fast_hug_asterisco(texto: str) -> str:
+    """Normaliza el bloque FAST HUG BID para que use asterisco de texto plano."""
+    if not texto:
+        return texto
+
+    def _normalizar(match: re.Match) -> str:
+        bloque = match.group(0)
+        lineas = bloque.splitlines()
+        nuevas = []
+        for linea in lineas:
+            if re.match(r"^\s*(?:[✓✔√☑\-\*])\s+", linea):
+                item = re.sub(r"^\s*(?:[✓✔√☑\-\*])\s+", "", linea).strip()
+                nuevas.append(f"* {item}")
+            else:
+                nuevas.append(linea)
+        return "\n".join(nuevas)
+
+    patron = r">>\s*FAST HUG BID:\s*\n(?:.*?)(?=\n\n|\n\(A\)\s*PROBLEMAS ACTIVOS:|\Z)"
+    return re.sub(patron, _normalizar, texto, flags=re.DOTALL)
+
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:
     """Genera el texto completo de evolución UTI/UCCO."""
     bloque_infusiones_dispositivos = construir_bloque_infusiones_dispositivos(datos)
@@ -412,7 +454,9 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
     nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
 
     fast_sel = datos.get("fast_sel", []) or []
-    fast_texto = "\n".join([f"- {letra}" for letra in fast_sel]) if fast_sel else "- Sin marcar."
+    fast_items_limpios = [limpiar_item_fast_hug(item) for item in fast_sel]
+    fast_items_limpios = [item for item in fast_items_limpios if item]
+    fast_texto = "\n".join([f"* {item}" for item in fast_items_limpios]) if fast_items_limpios else "* Sin marcar."
 
     bloque_piel_upp = formatear_bloque_upp(datos)
 
@@ -460,4 +504,6 @@ DIAGNÓSTICO:
 (P) PLAN:
 {datos.get('plan')}
 """
-    return eliminar_bloque_alertas_seguridad(texto_final)
+    texto_final = eliminar_bloque_alertas_seguridad(texto_final)
+    texto_final = normalizar_fast_hug_asterisco(texto_final)
+    return texto_final
