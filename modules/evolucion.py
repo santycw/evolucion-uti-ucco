@@ -187,6 +187,8 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("EB", datos.get("eb", ""), "mEq/L"),
         ("Lac", datos.get("lactato", ""), "mmol/L"),
     ])
+    if l_eab and s(datos.get("tipo_gases", "")).strip():
+        l_eab = f"{s(datos.get('tipo_gases')).strip()}: {l_eab}"
 
     l_hemo = construir_linea_lab([
         ("Hb", datos.get("hb", ""), "g/dL"),
@@ -194,6 +196,26 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("GB", datos.get("gb", ""), "/mm³"),
         ("Plaq", datos.get("plaq", ""), "/mm³"),
     ])
+
+    l_formula = construir_linea_lab([
+        ("Neut", datos.get("neutrofilos", ""), "%"),
+        ("Linf", datos.get("linfocitos", ""), "%"),
+        ("Mono", datos.get("monocitos", ""), "%"),
+        ("Eos", datos.get("eosinofilos", ""), "%"),
+        ("Baso", datos.get("basofilos", ""), "%"),
+        ("Cay", datos.get("cayados", ""), "%"),
+    ])
+    if l_formula:
+        l_formula = f"Fórmula leucocitaria: {l_formula}"
+
+    l_indices = construir_linea_lab([
+        ("VCM", datos.get("vcm", ""), "fL"),
+        ("HCM", datos.get("hcm", ""), "pg"),
+        ("CHCM", datos.get("chcm", ""), "g/dL"),
+        ("RDW", datos.get("rdw", ""), "%"),
+    ])
+    if l_indices:
+        l_indices = f"Índices hematimétricos: {l_indices}"
 
     l_coag = construir_linea_lab([
         ("APP", datos.get("app", ""), "%"),
@@ -237,9 +259,11 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("Tropo I", datos.get("tropo", ""), "ng/mL"),
         ("proBNP", datos.get("bnp", ""), "pg/mL"),
         ("PCT", datos.get("pct", ""), "ng/mL"),
+        ("Lipasa", datos.get("lipasa", ""), "UI/L"),
+        ("Amilasa", datos.get("amilasa", ""), "UI/L"),
     ])
 
-    lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
+    lab_blocks = [l for l in [l_eab, l_hemo, l_formula, l_indices, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
     texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta."
 
     ecg_items = [
@@ -388,7 +412,7 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
     nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
 
     fast_sel = datos.get("fast_sel", []) or []
-    fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
+    fast_texto = "\n".join([f"- {letra}" for letra in fast_sel]) if fast_sel else "- Sin marcar."
 
     bloque_piel_upp = formatear_bloque_upp(datos)
 

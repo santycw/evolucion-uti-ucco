@@ -780,6 +780,13 @@ with tab_lab:
     st.info("💡 Solo se imprimirán en la evolución los valores que completes explícitamente.")
     with st.container(border=True):
         st.subheader("🌬️ EAB (Estado Ácido-Base)")
+        tipo_gases = st.selectbox(
+            "Tipo de gases",
+            ["", "Gases arteriales", "Gases venosos"],
+            key=f"tipo_gases_{rk}",
+            help="Seleccione si la muestra corresponde a gases arteriales o venosos.",
+        )
+
         e1, e2, e3, e4, e5, e6, e7 = st.columns(7)
         ph = e1.text_input("pH", key=f"ph_{rk}")
         pco2 = e2.text_input("pCO2 (mmHg)", key=f"pco2_{rk}")
@@ -796,6 +803,22 @@ with tab_lab:
         hto = l2.text_input("Hto (%)", key=f"hto_{rk}")
         gb = l3.text_input("GB (/mm³)", key=f"gb_{rk}")
         plaq = l4.text_input("Plaq (/mm³)", key=f"plaq_{rk}")
+
+        with st.expander("Fórmula leucocitaria", expanded=False):
+            fl1, fl2, fl3, fl4, fl5, fl6 = st.columns(6)
+            neutrofilos = fl1.text_input("Neutrófilos (%)", key=f"neutrofilos_{rk}")
+            linfocitos = fl2.text_input("Linfocitos (%)", key=f"linfocitos_{rk}")
+            monocitos = fl3.text_input("Monocitos (%)", key=f"monocitos_{rk}")
+            eosinofilos = fl4.text_input("Eosinófilos (%)", key=f"eosinofilos_{rk}")
+            basofilos = fl5.text_input("Basófilos (%)", key=f"basofilos_{rk}")
+            cayados = fl6.text_input("Cayados (%)", key=f"cayados_{rk}")
+
+        with st.expander("Índices hematimétricos", expanded=False):
+            ih1, ih2, ih3, ih4 = st.columns(4)
+            vcm = ih1.text_input("VCM (fL)", key=f"vcm_{rk}")
+            hcm = ih2.text_input("HCM (pg)", key=f"hcm_{rk}")
+            chcm = ih3.text_input("CHCM (g/dL)", key=f"chcm_{rk}")
+            rdw = ih4.text_input("RDW (%)", key=f"rdw_{rk}")
 
         c1, c2, c3 = st.columns(3)
         app = c1.text_input("APP (%)", key=f"app_{rk}")
@@ -841,6 +864,10 @@ with tab_lab:
         tropo = b4.text_input("Tropo I (ng/mL)", key=f"tropo_{rk}")
         bnp = b5.text_input("proBNP (pg/mL)", key=f"bnp_{rk}")
         pct = b6.text_input("PCT (ng/mL)", key=f"pct_{rk}")
+
+        enz1, enz2 = st.columns(2)
+        lipasa = enz1.text_input("Lipasa sérica (UI/L)", key=f"lipasa_{rk}")
+        amilasa = enz2.text_input("Amilasa sérica (UI/L)", key=f"amilasa_{rk}")
 
 with tab_estudios:
     with st.container(border=True):
