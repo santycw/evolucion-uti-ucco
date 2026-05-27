@@ -100,34 +100,121 @@ def formatear_scores_para_evolucion(scores_globales: List[dict]) -> List[str]:
     return lineas
 
 
+def formatear_infusion_para_evolucion(infusion: Any) -> str:
+    """
+    Simplifica una infusión automatizada para la evolución final.
+
+    Entrada habitual:
+    Noradrenalina: 4 mg/UI en 100 ml (...); Bomba 4 ml/h; Dosis 0.0571 mcg/kg/min
+
+    Salida:
+    Noradrenalina: 0.0571 mcg/kg/min
+    """
+    texto = s(infusion).strip()
+    if not texto:
+        return ""
+
+    nombre = texto.split(":", 1)[0].strip() if ":" in texto else ""
+
+    match_dosis = re.search(r"Dosis\s+([0-9]+(?:[.,][0-9]+)?)\s+([^;]+)$", texto, flags=re.IGNORECASE)
+    if match_dosis and nombre:
+        valor = match_dosis.group(1).replace(",", ".")
+        unidad = match_dosis.group(2).strip()
+        return f"{nombre}: {valor} {unidad}"
+
+    return texto
+
+
 def construir_bloque_infusiones_dispositivos(datos: dict) -> str:
-    """Imprime infusiones/invasiones solo si existen datos cargados."""
-    partes = []
+    """
+    Imprime infusiones y dispositivos en bloques separados.
+
+    Formato:
+    >> INFUSIONES:
+    Infusiones activas:
+    - Noradrenalina: 0.0571 mcg/kg/min
+
+    >> DISPOSITIVOS:
+    CVC: ...
+    Cat Art: ...
+    SV: ...
+    SNG/SOG/SNY/Botón gástrico: ...
+    """
+    bloques = []
 
     infusiones = datos.get("infusiones_automatizadas", []) or []
-    infusiones = [s(x).strip() for x in infusiones if s(x).strip()]
-    if infusiones:
-        partes.append("Infusiones Activas: " + " | ".join(infusiones))
+    infusiones = [formatear_infusion_para_evolucion(x) for x in infusiones]
+    infusiones = [x for x in infusiones if x]
 
-    invasiones = []
+    if infusiones:
+        lineas_infusiones = [">> INFUSIONES:", "Infusiones activas:"]
+        lineas_infusiones.extend([f"- {infusion}" for infusion in infusiones])
+        bloques.append("\n".join(lineas_infusiones))
+
+    dispositivos = []
     for etiqueta, clave in [
         ("CVC", "cvc_info"),
-        ("Cat.Art", "ca_info"),
+        ("Cat Art", "ca_info"),
         ("SV", "sv_dias"),
-        ("SNG", "sng_dias"),
+        ("SNG/SOG/SNY/Botón gástrico", "sng_dias"),
     ]:
         valor = s(datos.get(clave, "")).strip()
         if valor:
-            invasiones.append(f"{etiqueta}: {valor}")
+            dispositivos.append(f"{etiqueta}: {valor}")
 
-    if invasiones:
-        partes.append("Invasiones: " + " | ".join(invasiones))
+    if dispositivos:
+        lineas_dispositivos = [">> DISPOSITIVOS:"]
+        lineas_dispositivos.extend(dispositivos)
+        bloques.append("\n".join(lineas_dispositivos))
 
-    if not partes:
+    if not bloques:
         return ""
 
-    return "\n>> INFUSIONES Y DISPOSITIVOS:\n" + "\n".join(partes) + "\n"
+    return "\n" + "\n".join(bloques) + "\n"
 
+
+
+
+
+def limpiar_item_fast_hug(item: Any) -> str:
+    """
+    Limpia símbolos incompatibles/heredados del FAST HUG BID.
+
+    Corrige casos guardados o generados previamente como:
+    - "✓ F – Feeding"
+    - "√ F – Feeding"
+    - "✔ F - Feeding"
+    - "- F - Feeding"
+
+    Devuelve siempre: "F - Feeding".
+    """
+    texto = s(item).strip()
+    texto = texto.replace("–", "-").replace("—", "-")
+    texto = re.sub(r"^[\s\-\•\*\u2713\u2714\u221A√✓✔☑]+", "", texto).strip()
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
+
+
+
+def normalizar_fast_hug_asterisco(texto: str) -> str:
+    """Normaliza el bloque FAST HUG BID para que use asterisco de texto plano."""
+    if not texto:
+        return texto
+
+    def _normalizar(match: re.Match) -> str:
+        bloque = match.group(0)
+        lineas = bloque.splitlines()
+        nuevas = []
+        for linea in lineas:
+            if re.match(r"^\s*(?:[✓✔√☑\-\*])\s+", linea):
+                item = re.sub(r"^\s*(?:[✓✔√☑\-\*])\s+", "", linea).strip()
+                nuevas.append(f"* {item}")
+            else:
+                nuevas.append(linea)
+        return "\n".join(nuevas)
+
+    patron = r">>\s*FAST HUG BID:\s*\n(?:.*?)(?=\n\n|\n\(A\)\s*PROBLEMAS ACTIVOS:|\Z)"
+    return re.sub(patron, _normalizar, texto, flags=re.DOTALL)
 
 def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[dict]) -> str:
     """Genera el texto completo de evolución UTI/UCCO."""
@@ -142,6 +229,8 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("EB", datos.get("eb", ""), "mEq/L"),
         ("Lac", datos.get("lactato", ""), "mmol/L"),
     ])
+    if l_eab and s(datos.get("tipo_gases", "")).strip():
+        l_eab = f"{s(datos.get('tipo_gases')).strip()}: {l_eab}"
 
     l_hemo = construir_linea_lab([
         ("Hb", datos.get("hb", ""), "g/dL"),
@@ -149,6 +238,26 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("GB", datos.get("gb", ""), "/mm³"),
         ("Plaq", datos.get("plaq", ""), "/mm³"),
     ])
+
+    l_formula = construir_linea_lab([
+        ("Neut", datos.get("neutrofilos", ""), "%"),
+        ("Linf", datos.get("linfocitos", ""), "%"),
+        ("Mono", datos.get("monocitos", ""), "%"),
+        ("Eos", datos.get("eosinofilos", ""), "%"),
+        ("Baso", datos.get("basofilos", ""), "%"),
+        ("Cay", datos.get("cayados", ""), "%"),
+    ])
+    if l_formula:
+        l_formula = f"Fórmula leucocitaria: {l_formula}"
+
+    l_indices = construir_linea_lab([
+        ("VCM", datos.get("vcm", ""), "fL"),
+        ("HCM", datos.get("hcm", ""), "pg"),
+        ("CHCM", datos.get("chcm", ""), "g/dL"),
+        ("RDW", datos.get("rdw", ""), "%"),
+    ])
+    if l_indices:
+        l_indices = f"Índices hematimétricos: {l_indices}"
 
     l_coag = construir_linea_lab([
         ("APP", datos.get("app", ""), "%"),
@@ -192,9 +301,11 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
         ("Tropo I", datos.get("tropo", ""), "ng/mL"),
         ("proBNP", datos.get("bnp", ""), "pg/mL"),
         ("PCT", datos.get("pct", ""), "ng/mL"),
+        ("Lipasa", datos.get("lipasa", ""), "UI/L"),
+        ("Amilasa", datos.get("amilasa", ""), "UI/L"),
     ])
 
-    lab_blocks = [l for l in [l_eab, l_hemo, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
+    lab_blocks = [l for l in [l_eab, l_hemo, l_formula, l_indices, l_coag, l_quim, l_hepa, l_inflam, l_bio] if l]
     texto_laboratorio = "\n".join(lab_blocks) if lab_blocks else "Pendiente / No consta."
 
     ecg_items = [
@@ -343,7 +454,9 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
     nutri_txt = f" | Nutrición: {nutricion}" if nutricion else ""
 
     fast_sel = datos.get("fast_sel", []) or []
-    fast_texto = "\n".join([f"  ✓ {letra}" for letra in fast_sel]) if fast_sel else "  Sin marcar."
+    fast_items_limpios = [limpiar_item_fast_hug(item) for item in fast_sel]
+    fast_items_limpios = [item for item in fast_items_limpios if item]
+    fast_texto = "\n".join([f"* {item}" for item in fast_items_limpios]) if fast_items_limpios else "* Sin marcar."
 
     bloque_piel_upp = formatear_bloque_upp(datos)
 
@@ -391,4 +504,6 @@ DIAGNÓSTICO:
 (P) PLAN:
 {datos.get('plan')}
 """
-    return eliminar_bloque_alertas_seguridad(texto_final)
+    texto_final = eliminar_bloque_alertas_seguridad(texto_final)
+    texto_final = normalizar_fast_hug_asterisco(texto_final)
+    return texto_final
