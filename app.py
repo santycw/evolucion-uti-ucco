@@ -685,6 +685,24 @@ with tab_clinica:
             "Máscara Venturi 50%": 50,
         }
 
+        def estimar_fio2_canula_nasal(litros_min: float) -> int:
+            """
+            Estimación clínica orientativa para cánula nasal convencional.
+            Regla usada: 1 L/min ≈ 24%, 2 L/min ≈ 28%, 3 L/min ≈ 32%,
+            4 L/min ≈ 36%, 5 L/min ≈ 40%, 6 L/min ≈ 44%.
+            """
+            try:
+                litros = float(litros_min)
+            except (TypeError, ValueError):
+                return 21
+
+            if litros <= 0:
+                return 21
+
+            # Fórmula práctica de bajo flujo: FiO2 aprox = 20 + 4 x L/min.
+            # Se limita a 44% para cánula nasal convencional.
+            return int(min(44, max(21, round(20 + (4 * litros)))))
+
         if paciente_ventilado:
             via_aerea = r_b1.text_input("Vía Aérea", d_str("TOT"), key=f"va_{rk}")
         else:
@@ -708,28 +726,59 @@ with tab_clinica:
             )
 
         fio2_key = f"fio2_{rk}"
-        fio2_auto = FIO2_AUTOMATICA_DISPOSITIVO.get(via_aerea)
-        if fio2_auto is not None:
+        o2_canula_l_min = ""
+
+        if not paciente_ventilado and via_aerea == "Cánula Nasal":
+            o2_canula_l_min = r_b2.number_input(
+                "O₂ cánula (L/min)",
+                min_value=0.0,
+                max_value=6.0,
+                value=2.0,
+                step=0.5,
+                key=f"o2_canula_l_min_{rk}",
+                help="Flujo de oxígeno aportado por cánula nasal convencional. Se usa para estimar FiO₂ automáticamente.",
+            )
+            fio2_auto = estimar_fio2_canula_nasal(o2_canula_l_min)
             st.session_state[fio2_key] = fio2_auto
-        elif fio2_key not in st.session_state:
-            st.session_state[fio2_key] = 21
 
-        fio2 = r_b2.number_input(
-            "FiO2 (%)",
-            21,
-            100,
-            key=fio2_key,
-            disabled=fio2_auto is not None,
-            help="En máscaras Venturi se completa automáticamente según el dispositivo seleccionado.",
-        )
-        if fio2_auto is not None:
-            r_b2.caption(f"FiO₂ automática por {via_aerea}: {fio2_auto}%")
+            fio2 = r_b3.number_input(
+                "FiO2 estimada (%)",
+                21,
+                100,
+                key=fio2_key,
+                disabled=True,
+                help="FiO₂ estimada por cánula nasal convencional: 1 L/min≈24%, 2≈28%, 3≈32%, 4≈36%, 5≈40%, 6≈44%.",
+            )
+            r_b3.caption(f"FiO₂ estimada por cánula nasal: {fio2_auto}%")
+            pafi_manual = st.text_input(
+                "PaFiO2 manual (solo gases arteriales)",
+                key=f"pafi_man_{rk}",
+                help="Solo se utiliza si en Laboratorio se selecciona Tipo de gases = Gases arteriales.",
+            )
 
-        pafi_manual = r_b3.text_input(
-            "PaFiO2 manual (solo gases arteriales)",
-            key=f"pafi_man_{rk}",
-            help="Solo se utiliza si en Laboratorio se selecciona Tipo de gases = Gases arteriales.",
-        )
+        else:
+            fio2_auto = FIO2_AUTOMATICA_DISPOSITIVO.get(via_aerea)
+            if fio2_auto is not None:
+                st.session_state[fio2_key] = fio2_auto
+            elif fio2_key not in st.session_state:
+                st.session_state[fio2_key] = 21
+
+            fio2 = r_b2.number_input(
+                "FiO2 (%)",
+                21,
+                100,
+                key=fio2_key,
+                disabled=fio2_auto is not None,
+                help="En máscaras Venturi se completa automáticamente según el dispositivo seleccionado.",
+            )
+            if fio2_auto is not None:
+                r_b2.caption(f"FiO₂ automática por {via_aerea}: {fio2_auto}%")
+
+            pafi_manual = r_b3.text_input(
+                "PaFiO2 manual (solo gases arteriales)",
+                key=f"pafi_man_{rk}",
+                help="Solo se utiliza si en Laboratorio se selecciona Tipo de gases = Gases arteriales.",
+            )
 
         modo = peep = ppico = pplat = comp = vt = dp_manual = ""
         if paciente_ventilado:

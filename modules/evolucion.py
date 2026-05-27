@@ -421,7 +421,11 @@ def generar_texto_evolucion(datos: dict, auto: dict, scores_para_imprimir: List[
   Examen: {datos.get('ex_resp', '')}"""
     else:
         pafi_str = f" | PaFiO2 {pafi_final}" if pafi_final else ""
-        texto_resp = f"""Dispositivo: {datos.get('via_aerea', '')} | FiO2 {datos.get('fio2')}%{pafi_str}.
+        dispositivo_resp = s(datos.get("via_aerea", "")).strip()
+        o2_canula = s(datos.get("o2_canula_l_min", "")).strip()
+        if dispositivo_resp == "Cánula Nasal" and o2_canula:
+            dispositivo_resp = f"{dispositivo_resp} {o2_canula} L/min"
+        texto_resp = f"""Dispositivo: {dispositivo_resp} | FiO2 {datos.get('fio2')}%{pafi_str}.
   Examen: {datos.get('ex_resp', '')}"""
 
     balance_txt = ""
