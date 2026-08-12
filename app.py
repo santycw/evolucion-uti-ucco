@@ -284,14 +284,14 @@ with tab_clinica:
                 "Remifentanilo (2 mg)": {"unidad": "mcg/kg/h", "mg": 2.0},
                 "Remifentanilo (5 mg)": {"unidad": "mcg/kg/h", "mg": 5.0},
                 "Morfina (10 mg)": {"unidad": "mg/h", "mg": 10.0},
-                "Propofol 1% (200 mg)": {"unidad": "mcg/kg/h", "mg": 200.0},
-                "Midazolam (15 mg)": {"unidad": "mcg/kg/h", "mg": 15.0},
-                "Midazolam (50 mg)": {"unidad": "mcg/kg/h", "mg": 50.0},
+                "Propofol 1% (200 mg)": {"unidad": "mg/kg/h", "mg": 200.0},
+                "Midazolam (15 mg)": {"unidad": "mg/kg/h", "mg": 15.0},
+                "Midazolam (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
                 "Dexmedetomidina (0.2 mg)": {"unidad": "mcg/kg/h", "mg": 0.2},
-                "Ketamina (500 mg)": {"unidad": "mcg/kg/h", "mg": 500.0},
+                "Ketamina (500 mg)": {"unidad": "mg/kg/h", "mg": 500.0},
                 "Furosemida (20 mg)": {"unidad": "mg/h", "mg": 20.0},
-                "Atracurio (50 mg)": {"unidad": "mcg/kg/h", "mg": 50.0},
-                "Pancuronio (4 mg)": {"unidad": "mcg/kg/h", "mg": 4.0}
+                "Atracurio (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Pancuronio (4 mg)": {"unidad": "mg/kg/h", "mg": 4.0}
             }
 
             droga_sel = st.selectbox("Seleccione el fármaco y presentación:", list(dict_calc_drogas.keys()), key=f"droga_sel_{rk}")
@@ -330,12 +330,25 @@ with tab_clinica:
                     rerun_app()
 
         st.caption("Invasiones / Accesos")
-        d1, d2, d3, d4 = st.columns(4)
-        cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
-        cvc2_info = d1.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
-        ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
-        sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+
+        opciones_cvc = ["No posee", "Yugular Int. Derecha", "Yugular Int. Izquierda", "Subclavia Derecha", "Subclavia Izquierda", "Femoral Derecha", "Femoral Izquierda", "PICC", "Otro"]
+        opciones_art = ["No posee", "Radial Derecha", "Radial Izquierda", "Femoral Derecha", "Femoral Izquierda", "Pedia Derecha", "Pedia Izquierda", "Otro"]
+
+        # Fila 1: Accesos principales
+        a1, a2, a3, a4 = st.columns(4)
+        cvc1_sitio = a1.selectbox("CVC 1 (Sitio)", opciones_cvc, key=f"cvc1_sitio_{rk}")
+        cvc1_dias = a1.text_input("Días CVC 1", key=f"cvc1_dias_{rk}")
+
+        ca_sitio = a2.selectbox("Cat. Art (Sitio)", opciones_art, key=f"ca_sitio_{rk}")
+        ca_dias = a2.text_input("Días Cat. Art", key=f"ca_dias_{rk}")
+
+        sv_dias = a3.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = a4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+
+        # Fila 2: Segundo CVC
+        b1, b2, b3, b4 = st.columns(4)
+        cvc2_sitio = b1.selectbox("CVC 2 (Opcional)", opciones_cvc, key=f"cvc2_sitio_{rk}")
+        cvc2_dias = b1.text_input("Días CVC 2", key=f"cvc2_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -1150,9 +1163,17 @@ with tab_planes:
 
         bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
-        cvc_combinado = f"{cvc_info}"
-        if cvc2_info.strip():
-            cvc_combinado += f" / {cvc2_info.strip()}"
+        cvc_arr = []
+        if cvc1_sitio != "No posee":
+            cvc_arr.append(f"{cvc1_sitio} ({cvc1_dias}d)" if cvc1_dias.strip() else f"{cvc1_sitio}")
+        if cvc2_sitio != "No posee":
+            cvc_arr.append(f"{cvc2_sitio} ({cvc2_dias}d)" if cvc2_dias.strip() else f"{cvc2_sitio}")
+        cvc_combinado = " / ".join(cvc_arr) if cvc_arr else "No posee"
+
+        if ca_sitio != "No posee":
+            ca_info = f"{ca_sitio} ({ca_dias}d)" if ca_dias.strip() else f"{ca_sitio}"
+        else:
+            ca_info = "No posee"
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
