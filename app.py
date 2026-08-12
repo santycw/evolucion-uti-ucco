@@ -284,14 +284,14 @@ with tab_clinica:
                 "Remifentanilo (2 mg)": {"unidad": "mcg/kg/h", "mg": 2.0},
                 "Remifentanilo (5 mg)": {"unidad": "mcg/kg/h", "mg": 5.0},
                 "Morfina (10 mg)": {"unidad": "mg/h", "mg": 10.0},
-                "Propofol 1% (200 mg)": {"unidad": "mg/kg/h", "mg": 200.0},
-                "Midazolam (15 mg)": {"unidad": "mg/kg/h", "mg": 15.0},
-                "Midazolam (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
+                "Propofol 1% (200 mg)": {"unidad": "mcg/kg/h", "mg": 200.0},
+                "Midazolam (15 mg)": {"unidad": "mcg/kg/h", "mg": 15.0},
+                "Midazolam (50 mg)": {"unidad": "mcg/kg/h", "mg": 50.0},
                 "Dexmedetomidina (0.2 mg)": {"unidad": "mcg/kg/h", "mg": 0.2},
-                "Ketamina (500 mg)": {"unidad": "mg/kg/h", "mg": 500.0},
+                "Ketamina (500 mg)": {"unidad": "mcg/kg/h", "mg": 500.0},
                 "Furosemida (20 mg)": {"unidad": "mg/h", "mg": 20.0},
-                "Atracurio (50 mg)": {"unidad": "mg/kg/h", "mg": 50.0},
-                "Pancuronio (4 mg)": {"unidad": "mg/kg/h", "mg": 4.0}
+                "Atracurio (50 mg)": {"unidad": "mcg/kg/h", "mg": 50.0},
+                "Pancuronio (4 mg)": {"unidad": "mcg/kg/h", "mg": 4.0}
             }
 
             droga_sel = st.selectbox("Seleccione el fármaco y presentación:", list(dict_calc_drogas.keys()), key=f"droga_sel_{rk}")
@@ -332,7 +332,7 @@ with tab_clinica:
         st.caption("Invasiones / Accesos")
         d1, d2, d3, d4 = st.columns(4)
         cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
-        cvc2_info = st.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
+        cvc2_info = d1.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
         ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
         sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
         sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
