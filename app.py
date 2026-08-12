@@ -330,13 +330,12 @@ with tab_clinica:
                     rerun_app()
 
         st.caption("Invasiones / Accesos")
-        d1, d2 = st.columns(2)
-        cvc_info = d1.text_area("Accesos Venosos Centrales (Especifique tipos, sitios y días)", key=f"cvc_info_{rk}", height=68)
-        ca_info = d2.text_area("Catéteres Arteriales (Sitios y días)", key=f"ca_info_{rk}", height=68)
-
-        d3, d4 = st.columns(2)
-        sv_dias = d3.text_input("Sonda Vesical (Día)", key=f"sv_dias_{rk}")
-        sng_dias = d4.text_input("Sonda Digestiva (Día)", key=f"sng_dias_{rk}")
+        d1, d2, d3, d4 = st.columns(4)
+        cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
+        cvc2_info = st.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
+        ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
+        sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -1151,6 +1150,10 @@ with tab_planes:
 
         bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
+        cvc_combinado = f"{cvc_info}"
+        if cvc2_info.strip():
+            cvc_combinado += f" / {cvc2_info.strip()}"
+
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
 
@@ -1162,7 +1165,7 @@ DIAGNÓSTICO:
 (O) OBJETIVO:
 >> INFUSIONES Y DISPOSITIVOS:
 Infusiones Activas: {str_automatizadas}
-Invasiones: CVC: {cvc_info} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
+Invasiones: CVC: {cvc_combinado} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
 {signos_vitales}
