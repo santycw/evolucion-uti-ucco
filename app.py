@@ -19,13 +19,6 @@ def d_str(valor_default):
     """Retorna un string vacío si la orden de limpieza global está activa."""
     return "" if st.session_state.get('limpiar_prellenado', False) else valor_default
 
-def rerun_app():
-    """Reejecuta la app manteniendo compatibilidad con versiones de Streamlit."""
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
-
 rk = st.session_state['rk']
 
 # --- MOTOR UNIVERSAL DE CÁLCULO DE INFUSIONES ---
@@ -143,7 +136,7 @@ def cargar_diccionario_medico():
                     if k not in data:
                         data[k] = v
                 return data
-        except Exception: return fallback_db
+        except: return fallback_db
     else: return fallback_db
 
 db_terminologia = cargar_diccionario_medico()
@@ -255,14 +248,14 @@ if is_fa:
 st.divider()
 
 # --- CUERPO PRINCIPAL ---
-tab_clinica, tab_lab, tab_estudios, tab_planes = st.tabs([
+tab_clinca, tab_lab, tab_estudios, tab_planes = st.tabs([
     "🩺 Clínica y Examen",
     "🧪 Laboratorio Integral",
     "🩻 ECG y Estudios",
     "📋 Plan y FAST-HUG"
 ])
 
-with tab_clinica:
+with tab_clinca:
     with st.container(border=True):
         st.subheader("(S) Subjetivo")
         subj = st.text_area("Novedades:", d_str("Paciente estable, sin intercurrencias agudas."), height=68, key=f"subj_{rk}")
@@ -276,9 +269,6 @@ with tab_clinica:
                 "Dopamina (200 mg)": {"unidad": "mcg/kg/min", "mg": 200.0},
                 "Dobutamina (250 mg)": {"unidad": "mcg/kg/min", "mg": 250.0},
                 "Milrinona (10 mg)": {"unidad": "mcg/kg/min", "mg": 10.0},
-                "Nitroglicerina (25 mg/5 ml)": {"unidad": "mcg/min", "mg": 25.0},
-                "Nitroprusiato de sodio (50 mg)": {"unidad": "mcg/kg/min", "mg": 50.0},
-                "Isoproterenol (1 mg/5 ml)": {"unidad": "mcg/min", "mg": 1.0},
                 "Vasopresina (20 UI)": {"unidad": "UI/min", "mg": 20.0},
                 "Fentanilo (0.25 mg)": {"unidad": "mcg/kg/h", "mg": 0.25},
                 "Remifentanilo (2 mg)": {"unidad": "mcg/kg/h", "mg": 2.0},
@@ -315,7 +305,7 @@ with tab_clinica:
                         item = f"{nombre_limpio}: {dosis_calc:.4f} {unidad_activa}"
                         if item not in st.session_state['infusiones_automatizadas']:
                             st.session_state['infusiones_automatizadas'].append(item)
-                            rerun_app()
+                            st.rerun()
             else:
                 dosis_obj = st.number_input(f"Dosis indicada ({unidad_activa})", min_value=0.0, value=0.0, format="%.4f", key=f"dosis_obj_{rk}")
                 if droga_mg > 0 and volumen_ml > 0:
@@ -327,28 +317,15 @@ with tab_clinica:
                 for inf in st.session_state['infusiones_automatizadas']: st.markdown(f"- `{inf}`")
                 if st.button("🗑️ Borrar memoria", key=f"btn_del_mem_{rk}"):
                     st.session_state['infusiones_automatizadas'] = []
-                    rerun_app()
+                    st.rerun()
 
         st.caption("Invasiones / Accesos")
-
-        opciones_cvc = ["No posee", "Yugular Int. Derecha", "Yugular Int. Izquierda", "Subclavia Derecha", "Subclavia Izquierda", "Femoral Derecha", "Femoral Izquierda", "PICC", "Otro"]
-        opciones_art = ["No posee", "Radial Derecha", "Radial Izquierda", "Femoral Derecha", "Femoral Izquierda", "Pedia Derecha", "Pedia Izquierda", "Otro"]
-
-        # Fila 1: Accesos principales
-        a1, a2, a3, a4 = st.columns(4)
-        cvc1_sitio = a1.selectbox("CVC 1 (Sitio)", opciones_cvc, key=f"cvc1_sitio_{rk}")
-        cvc1_dias = a1.text_input("Días CVC 1", key=f"cvc1_dias_{rk}")
-
-        ca_sitio = a2.selectbox("Cat. Art (Sitio)", opciones_art, key=f"ca_sitio_{rk}")
-        ca_dias = a2.text_input("Días Cat. Art", key=f"ca_dias_{rk}")
-
-        sv_dias = a3.text_input("SV (Día)", key=f"sv_dias_{rk}")
-        sng_dias = a4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
-
-        # Fila 2: Segundo CVC
-        b1, b2, b3, b4 = st.columns(4)
-        cvc2_sitio = b1.selectbox("CVC 2 (Opcional)", opciones_cvc, key=f"cvc2_sitio_{rk}")
-        cvc2_dias = b1.text_input("Días CVC 2", key=f"cvc2_dias_{rk}")
+        d1, d2, d3, d4 = st.columns(4)
+        cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
+        cvc2_info = d1.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
+        ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
+        sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
+        sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -381,7 +358,7 @@ with tab_clinica:
                     pvc_f = float(pvc.replace(',', '.'))
                     par_calc = (fc_f * pvc_f) / t_mean
                     par_ui_str = f"{par_calc:.2f}"
-        except Exception: pass
+        except: pass
         v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM", key=f"par_{rk}")
 
         ex_cv = st.text_area("Ex. Cardiovascular", d_str("Sin livideces. R1/R2 normofonéticos."), key=f"ex_cv_{rk}")
@@ -535,7 +512,7 @@ with tab_estudios:
                     rr_sec = 60.0 / fc_val
                     qtc_val = qt_val / math.sqrt(rr_sec)
                     qtc_ui_str = f"{qtc_val:.0f}"
-        except Exception: pass
+        except: pass
 
         ecg_qtc = e_col6.text_input("QTc Auto (ms)", value=qtc_ui_str, disabled=True, help="Bazett: QT / √RR", key=f"ecg_qtc_{rk}")
         ecg_onda_p = e_col7.text_input("Onda P (ms)", key=f"ecg_ondap_{rk}")
@@ -552,7 +529,7 @@ with tab_estudios:
 # --- RUTINA CENTRAL DE AUTO-CÁLCULO ---
 def p_num(val):
     try: return float(str(val).replace(',', '.').strip())
-    except Exception: return None
+    except: return None
 
 sys_bp, dia_bp, tam_val, pp_val = None, None, "", ""
 if ta and "/" in ta:
@@ -561,12 +538,12 @@ if ta and "/" in ta:
         dia_bp = float(ta.split("/")[1])
         tam_val = round((sys_bp + 2*dia_bp)/3)
         pp_val = int(sys_bp - dia_bp)
-    except Exception: pass
+    except: pass
 
 gl_val = 15
 if glasgow:
     try: gl_val = int(glasgow.split("/")[0])
-    except Exception: pass
+    except: pass
 
 pafi_val = p_num(pafi_manual)
 po2_n = p_num(po2)
@@ -1007,7 +984,7 @@ with tab_planes:
 
     if btn_limpiar:
         st.session_state.clear()
-        rerun_app()
+        st.rerun()
 
     if btn_generar:
         if st.session_state['infusiones_automatizadas']:
@@ -1016,11 +993,7 @@ with tab_planes:
             str_automatizadas = "Sin infusiones activas."
 
         def construir_linea_lab(items):
-            validos = [
-                f"{nombre} {str(val).strip()} {uni}".strip()
-                for nombre, val, uni in items
-                if str(val).strip()
-            ]
+            validos = [f"{nombre} {val} {uni}".strip() for nombre, val, uni in items if val.strip()]
             return " | ".join(validos) if validos else ""
 
         l_eab = construir_linea_lab([("pH", ph, ""), ("pCO2", pco2, "mmHg"), ("pO2", po2, "mmHg"), ("SatO2", sato2_eab, "%"), ("HCO3", hco3, "mEq/L"), ("EB", eb, "mEq/L"), ("Lac", lactato, "mmol/L")])
@@ -1055,11 +1028,7 @@ with tab_planes:
             ("FC", ecg_fc, "lpm"), ("Ritmo", ecg_ritmo, ""), ("Eje", ecg_eje, "°"), ("PR", ecg_pr, "ms"),
             ("QRS", ecg_qrs_ms, "ms"), ("QT", ecg_qt, "ms"), ("QTc", ecg_qtc, "ms"), ("Onda P", ecg_onda_p, "ms"), ("ST", ecg_st, "")
         ]
-        ecg_validos = [
-            f"{n} {str(v).strip()}{u}".strip()
-            for n, v, u in ecg_items
-            if str(v).strip()
-        ]
+        ecg_validos = [f"{n} {v}{u}".strip() for n, v, u in ecg_items if v.strip()]
         if ecg_conclusiones.strip():
             ecg_validos.append(f"Conclusión: {ecg_conclusiones.strip()}")
         ecg_final = "- ECG: " + " | ".join(ecg_validos) if ecg_validos else ""
@@ -1114,7 +1083,7 @@ with tab_planes:
             pplat_val = p_num(pplat)
             if not dp_final and pplat_val and peep:
                 try: dp_final = str(int(pplat_val - float(peep)))
-                except Exception: pass
+                except: pass
             texto_resp = f"""{via_aerea}, Modo {modo}, FiO2 {fio2}%, PEEP {peep} cmH2O, PPlat {pplat} cmH2O, Vt {vt} ml.
   Mecánica: P.Pico {ppico} cmH2O | DP {dp_final} | PaFiO2 {pafi_final}.
   Examen: {ex_resp}"""
@@ -1163,17 +1132,8 @@ with tab_planes:
 
         bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
-        cvc_arr = []
-        if cvc1_sitio != "No posee":
-            cvc_arr.append(f"{cvc1_sitio} ({cvc1_dias}d)" if cvc1_dias.strip() else f"{cvc1_sitio}")
-        if cvc2_sitio != "No posee":
-            cvc_arr.append(f"{cvc2_sitio} ({cvc2_dias}d)" if cvc2_dias.strip() else f"{cvc2_sitio}")
-        cvc_combinado = " / ".join(cvc_arr) if cvc_arr else "No posee"
-
-        if ca_sitio != "No posee":
-            ca_info = f"{ca_sitio} ({ca_dias}d)" if ca_dias.strip() else f"{ca_sitio}"
-        else:
-            ca_info = "No posee"
+        cvc_arr = [c.strip() for c in [cvc_info, cvc2_info] if c.strip()]
+        cvc_combinado = " / ".join(cvc_arr)
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
