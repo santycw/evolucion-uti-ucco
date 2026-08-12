@@ -322,10 +322,12 @@ with tab_clinca:
         st.caption("Invasiones / Accesos")
         d1, d2, d3, d4 = st.columns(4)
         cvc_info = d1.text_input("CVC (Sitio/Día)", key=f"cvc_info_{rk}")
-        cvc2_info = d1.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
         ca_info = d2.text_input("Cat. Art (Sitio/Día)", key=f"ca_info_{rk}")
         sv_dias = d3.text_input("SV (Día)", key=f"sv_dias_{rk}")
         sng_dias = d4.text_input("SNG (Día)", key=f"sng_dias_{rk}")
+
+        c1, c2, c3, c4 = st.columns(4)
+        cvc2_info = c1.text_input("Segundo CVC opcional (Sitio/Día)", key=f"cvc2_info_{rk}")
 
     with st.container(border=True):
         st.subheader("1. Neurológico y Hemodinamia")
@@ -345,7 +347,7 @@ with tab_clinca:
         v1, v2, v3, v4 = st.columns(4)
         pvc = v1.text_input("PVC (cmH2O)", key=f"pvc_{rk}")
         relleno_cap = v2.text_input("Relleno Capilar", d_str("< 2 seg"), key=f"relleno_{rk}")
-        hgt = v4.text_input("HGT (mg/dL)", key=f"hgt_{rk}")
+        hgt = v3.text_input("HGT (mg/dL)", key=f"hgt_{rk}")
 
         par_ui_str = ""
         try:
@@ -359,7 +361,7 @@ with tab_clinca:
                     par_calc = (fc_f * pvc_f) / t_mean
                     par_ui_str = f"{par_calc:.2f}"
         except: pass
-        v3.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM", key=f"par_{rk}")
+        v4.text_input("PAR (Auto)", value=par_ui_str, disabled=True, help="Fórmula: (FC × PVC) / TAM", key=f"par_{rk}")
 
         ex_cv = st.text_area("Ex. Cardiovascular", d_str("Sin livideces. R1/R2 normofonéticos."), key=f"ex_cv_{rk}")
 
@@ -984,7 +986,7 @@ with tab_planes:
 
     if btn_limpiar:
         st.session_state.clear()
-        st.rerun()
+        st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)
 
     if btn_generar:
         if st.session_state['infusiones_automatizadas']:
@@ -1064,8 +1066,6 @@ with tab_planes:
         if fc_n is not None and pvc_n is not None and tam_val and tam_val > 0:
             par_str = f"\n  PAR: {(fc_n * pvc_n) / tam_val:.2f}"
 
-        hgt_str = f"\n  HGT: {hgt.strip()} mg/dL" if hgt.strip() else ""
-
         signos_vitales = f"""- SIGNOS VITALES:
   TA: {ta if ta.strip() else '-'} mmHg
   TAM: {tam_str} mmHg
@@ -1076,7 +1076,8 @@ with tab_planes:
   FR: {fr if fr.strip() else '-'} rpm
   SatO2: {sat if sat.strip() else '-'} %
   FiO2: {fio2 if fio2 else '-'} %
-  T°: {temp if temp.strip() else '-'} °C{hgt_str}"""
+  T°: {temp if temp.strip() else '-'} °C
+  HGT: {hgt if hgt.strip() else '-'} mg/dL"""
 
         if paciente_ventilado:
             dp_final = dp_manual
@@ -1132,8 +1133,9 @@ with tab_planes:
 
         bloque_problemas_manual = f"Otros: {problemas_activos_manual.strip()}\n" if problemas_activos_manual.strip() else ""
 
-        cvc_arr = [c.strip() for c in [cvc_info, cvc2_info] if c.strip()]
-        cvc_combinado = " / ".join(cvc_arr)
+        cvc_final = cvc_info
+        if cvc2_info.strip():
+            cvc_final += f" / {cvc2_info.strip()}"
 
         texto_final = f"""EVOLUCIÓN UTI / UCCO
 Días Hosp: {dias_int_hosp} | Días UTI: {dias_int_uti} | Días ARM: {dias_arm}
@@ -1146,7 +1148,7 @@ DIAGNÓSTICO:
 (O) OBJETIVO:
 >> INFUSIONES Y DISPOSITIVOS:
 Infusiones Activas: {str_automatizadas}
-Invasiones: CVC: {cvc_combinado} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
+Invasiones: CVC: {cvc_final} | Cat.Art: {ca_info} | SV: {sv_dias} | SNG: {sng_dias}
 
 >> EXAMEN FÍSICO Y SIGNOS VITALES:
 {signos_vitales}
